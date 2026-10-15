@@ -18,11 +18,9 @@ import os
 import sys
 from pathlib import Path
 
-import anthropic
-from dotenv import load_dotenv
-
 from agents.builder.handlers import AGENT, BuilderHandlers
 from orchestrator import budget
+from orchestrator.config import anthropic_client, load_env
 from orchestrator.data_client import DataClient
 from orchestrator.store import Store, get_store
 
@@ -54,8 +52,8 @@ def ensure_candidate(store: Store, data: DataClient, uarn: str) -> None:
 
 
 def run(uarn: str) -> None:
-    load_dotenv(ROOT / ".env")
-    client = anthropic.Anthropic()
+    load_env()
+    client = anthropic_client()   # key and workspace from the environment
     store, data = get_store(), DataClient()
     handlers = BuilderHandlers(store, data)
     ensure_candidate(store, data, uarn)

@@ -11,8 +11,9 @@ Every session gets both:
 from __future__ import annotations
 
 import math
-import os
 from dataclasses import dataclass, field
+
+from orchestrator.config import env_int
 
 # List prices per million tokens (input, output), USD.
 PRICES_PER_MTOK = {
@@ -23,11 +24,11 @@ PRICES_PER_MTOK = {
 
 
 def token_budget() -> int:
-    return int(os.getenv("SESSION_TOKEN_BUDGET", "200000"))
+    return env_int("SESSION_TOKEN_BUDGET", 200_000)
 
 
 def turn_cap() -> int:
-    return int(os.getenv("SESSION_TURN_CAP", "40"))
+    return env_int("SESSION_TURN_CAP", 40)
 
 
 def platform_budget(model: str, tokens: int | None = None) -> dict:
