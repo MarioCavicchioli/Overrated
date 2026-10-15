@@ -173,6 +173,33 @@ def test_submit_writes_pack_pdf_and_events(store, data):
     assert [e["kind"] for e in store.list_events()] == ["pack_written"]
 
 
+def scout_run(store, name):
+    run_id = str(__import__("uuid").uuid4())
+    store._insert("scout_runs", {"run_id": run_id, "area_name": name, "source_snapshot": "t",
+                                 "config": {}})
+    return run_id
+
+
+def test_scout_router_writes_against_its_runs_candidate(store, data):
+    """The same UARN is a candidate in two runs; the pack belongs to the Scout's run."""
+    from orchestrator.scout_tools import ScoutToolRouter
+    hackney, lookups = scout_run(store, "Hackney"), scout_run(store, "Customer lookups")
+    for cid, run, created in (("hackney-row", hackney, "2026-10-15T10:00:00+00:00"),
+                              ("lookup-row", lookups, "2026-10-15T11:00:00+00:00")):  # newer
+        store._insert("candidates", {
+            "candidate_id": cid, "run_id": run, "uarn": "1001008", "source_snapshot": "t",
+            "address": "137 Mare Street", "rv": 35475, "flags": [], "evidence_refs": [],
+            "status": "building_pack", "created_at": created, "updated_at": created})
+    assert store.get_candidate("1001008")["candidate_id"] == "lookup-row"   # latest, no run given
+    router = ScoutToolRouter(store, data, run_id=hackney)
+    args = {k: v for k, v in good_pack(data).items() if k not in ("case_id", "version")}
+    assert router("submit_pack", args).startswith("ACCEPTED")
+    pack = store.get_pack("c_0001")
+    assert pack["candidate_id"] == store.get_candidate("1001008", hackney)["candidate_id"]
+    assert store.get_candidate("1001008", hackney)["status"] == "pack_ready"
+    assert store.get_candidate("1001008", lookups)["status"] == "building_pack"   # untouched
+
+
 def test_rejected_pack_writes_nothing(store, data):
     seed(store, data, "1001008")
     h = BuilderHandlers(store, data)

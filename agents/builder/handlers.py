@@ -31,9 +31,12 @@ TOOLS = DATA_TOOLS + ("eligible_comparables", "submit_pack", "no_case")
 
 
 class BuilderHandlers:
-    def __init__(self, store: Store, data: DataClient):
+    def __init__(self, store: Store, data: DataClient, run_id: str | None = None):
+        """run_id: the Scout run whose candidates this builder works on, when it runs in
+        the Scout's workflow runs (a UARN can be a candidate in several runs)."""
         self.store = store
         self.data = data
+        self.run_id = run_id
         self.attempts: dict[str, int] = defaultdict(int)   # uarn -> submit_pack calls
 
     def handles(self, name: str) -> bool:
@@ -86,7 +89,7 @@ class BuilderHandlers:
         if errors:
             self.store.add_event(AGENT, "pack_rejected",
                                  f"{uarn}: attempt {attempt}, {len(errors)} problem(s): "
-                                 f"{errors[0]}")
+                                 f"{errors[0]}", run_id=self.run_id)
             left = MAX_SUBMIT_ATTEMPTS - attempt
             return ("REJECTED. Nothing was written. Fix every problem and call submit_pack "
                     f"again ({left} attempt(s) left), or call no_case if it can't be fixed:\n- "
@@ -98,14 +101,14 @@ class BuilderHandlers:
             "case_id": pack["case_id"], "uarn": uarn, "pack": pack,
             "comparables": pack["comparables"], "proposed_rv": pack["proposed_rv"],
             "annual_saving": pack["annual_saving"], "argument": pack["argument"],
-            "pdf_url": pdf_url, "version": VERSION,
+            "pdf_url": pdf_url, "version": VERSION, "run_id": self.run_id,
         })
-        self.store.set_candidate_status(uarn, "pack_ready")
+        self.store.set_candidate_status(uarn, "pack_ready", self.run_id)
         self.store.add_event(
             AGENT, "pack_written",
             f"{pack['address']}: £{pack['current_rv']:,} -> £{pack['proposed_rv']:,}, "
             f"saving £{pack['annual_saving']:,}/yr, {len(pack['comparables'])} comparables",
-            case_id=pack["case_id"])
+            case_id=pack["case_id"], run_id=self.run_id)
         return (f"ACCEPTED. Pack {pack['case_id']} written, annual saving "
                 f"£{pack['annual_saving']:,}. Your work on this candidate is done.")
 
@@ -125,10 +128,11 @@ class BuilderHandlers:
         uarn, reason = args.get("uarn", ""), args.get("reason", "").strip()
         if not reason:
             return "ERROR: give a reason"
-        if self.store.get_candidate(uarn) is None:
-            return f"ERROR: {uarn} is not in candidates"
-        self.store.set_candidate_status(uarn, "no_case")
-        self.store.add_event(AGENT, "no_case", f"{uarn}: {reason}")
+        if self.store.get_candidate(uarn, self.run_id) is None:
+            return f"ERROR: {uarn} is not in candidates" + (
+                f" for run {self.run_id}" if self.run_id else "")
+        self.store.set_candidate_status(uarn, "no_case", self.run_id)
+        self.store.add_event(AGENT, "no_case", f"{uarn}: {reason}", run_id=self.run_id)
         return "Recorded: dropped by builder. Your work on this candidate is done."
 
 

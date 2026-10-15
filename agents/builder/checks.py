@@ -81,6 +81,7 @@ def eligible_comparables(uarn: str, data: DataClient) -> list[dict]:
         from_subject = (c["zone_a_price"] - subject["zone_a_price"]) / spread
         out.append({"uarn": c["uarn"], "zone_a_price": c["zone_a_price"],
                     "distance_m": c["distance_m"], "use": c["use"],
+                    "postcode": c.get("postcode"),
                     "floor_area_ratio": round(ratio, 2),
                     "spreads_from_median": round(spreads, 2),
                     "spreads_from_subject": round(from_subject, 2),
@@ -122,6 +123,10 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
     if abs(pack["calc"]["street_spread"] - tone["spread"]) > PRICE_TOL:
         errors.append(f"calc.street_spread is {pack['calc']['street_spread']}, "
                       f"street_tone says {tone['spread']}")
+    if tone.get("mad") == 0:
+        errors.append(f"no clear case: the street segment's prices have no spread (MAD 0 over "
+                      f"{tone.get('count')} shops), so its spread is only the 5% floor and "
+                      "'spreads above the median' means nothing here: call no_case")
 
     # Everything on the subject's street segment, any use, as the data service sees it.
     pool = {c["uarn"]: c for c in data.comparables(
@@ -129,6 +134,7 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
 
     seen: set[str] = set()
     comp_prices: list[float] = []
+    comp_records: list[dict] = []
     for i, comp in enumerate(pack["comparables"]):
         tag = f"comparables[{i}] {comp['uarn']}"
         if comp["uarn"] in seen:
@@ -162,10 +168,24 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
             errors.append(f"{tag}: floor area is {ratio:.2f}x the subject's; "
                           f"must be {SIZE_RATIO_MIN}-{SIZE_RATIO_MAX}x")
         comp_prices.append(record["zone_a_price"])
+        comp_records.append(record)
 
     # No cherry-picking: the pack must use every eligible comparable, and may leave
     # one out only if it is more than EXCLUDE_BEYOND_SPREADS from the street median.
     eligible = {c["uarn"]: c for c in eligible_comparables(pack["uarn"], data)}
+
+    # A lower price that only comes from another postcode, while a neighbour in the
+    # subject's own postcode is priced like it, is a different building's tone
+    # (Seven Sisters Road c_0101), not evidence that the subject is overvalued.
+    here = subject.get("postcode")
+    supporting = [r for r in comp_records if r["zone_a_price"] < subject["zone_a_price"]]
+    twins = [e for e in eligible.values() if here and e.get("postcode") == here
+             and abs(e["spreads_from_subject"]) <= SUBJECT_TWIN_SPREADS]
+    if here and supporting and twins and all(r.get("postcode") != here for r in supporting):
+        errors.append(f"no clear case: every comparable priced below the candidate is in a "
+                      f"different postcode, while {twins[0]['uarn']} in its own postcode ({here}) "
+                      f"is priced like it (£{twins[0]['zone_a_price']}); the lower price is another "
+                      "building's tone: call no_case")
     excluded: dict[str, dict] = {}
     if len(pack.get("exclusions", [])) > MAX_EXCLUSIONS:
         errors.append(f"exclusions: {len(pack['exclusions'])} listed; a pack may leave out at most "
