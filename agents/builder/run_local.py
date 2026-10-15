@@ -17,7 +17,7 @@ import sys
 from agents.builder.handlers import AGENT, BuilderHandlers
 from orchestrator import budget
 from orchestrator.config import anthropic_client, load_env
-from orchestrator.data_client import DataClient
+from orchestrator.data_client import DataClient, make_data_client
 from orchestrator.sessions import resource_id, run_session
 from orchestrator.store import Store, get_store
 
@@ -39,7 +39,7 @@ def ensure_candidate(store: Store, data: DataClient, uarn: str) -> None:
         "uarn": uarn, "address": v["address"], "postcode": v["postcode"],
         "street_key": v["street_key"], "rv": v["rv"], "zone_a_price": v["zone_a_price"],
         "street_median": tone["median_zone_a"],
-        "z_score": round((v["zone_a_price"] - tone["median_zone_a"]) / tone["spread_mad"], 2),
+        "z_score": round((v["zone_a_price"] - tone["median_zone_a"]) / tone["spread"], 2),
         "flags": ["zone_a_above_street"], "status": "building_pack",
     })
 
@@ -47,7 +47,7 @@ def ensure_candidate(store: Store, data: DataClient, uarn: str) -> None:
 def run(uarn: str) -> None:
     load_env()
     client = anthropic_client()   # key and workspace from the environment
-    store, data = get_store(), DataClient()
+    store, data = get_store(), make_data_client()
     handlers = BuilderHandlers(store, data)
     ensure_candidate(store, data, uarn)
 

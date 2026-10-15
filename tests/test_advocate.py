@@ -68,9 +68,9 @@ def test_input_is_only_the_pack_and_facts_delimited_as_data(data):
 
 
 def test_facts_for_borderline_pack(data):
-    """c_0003: 1001012 is only 1.64 spreads up, £5 above its nearest shop."""
+    """c_0003: 1001012 is only 1.1 spreads up (team spread: 1.4826 x MAD), £5 above its nearest shop."""
     facts = runner.pack_facts(load_fixtures()["c_0003"], data)
-    assert facts["spreads_from_street_median"] == 1.64
+    assert facts["spreads_from_street_median"] == 1.1
     assert facts["nearest_same_use"] == {"uarn": "1001011", "zone_a_price": 445,
                                          "distance_m": 25.0, "subject_minus_it": 5}
     near = facts["same_use_within_100m"]

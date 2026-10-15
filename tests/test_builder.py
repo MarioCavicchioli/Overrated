@@ -49,8 +49,8 @@ def build_pack(data: DataClient, uarn: str, exclude: tuple[str, ...] = ()) -> di
         "address": s["address"], "current_rv": s["rv"], "proposed_rv": proposed,
         "comparables": comps,
         "calc": {"zone_a_price": s["zone_a_price"], "street_median": tone["median_zone_a"],
-                 "street_spread": tone["spread_mad"]},
-        "annual_saving": rates.annual_saving(s["rv"], proposed, s["use"]),
+                 "street_spread": tone["spread"]},
+        "annual_saving": rates.annual_saving(s["rv"], proposed, rates.use_of(s)),
         "argument": "Similar shops nearby on the same street are valued at a lower Zone A "
                     "price per m2 than this shop.",
     }

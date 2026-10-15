@@ -50,8 +50,8 @@ tools:
   - type: custom
     name: street_tone
     description: >-
-      Zone A price statistics for a street segment: median_zone_a, spread_mad (median
-      absolute deviation), mean, count and uses.
+      Zone A price statistics for a street segment: median_zone_a, spread (1.4826 x the
+      median absolute deviation, at least 5% of the median), mad, mean and count.
     input_schema:
       type: object
       properties:
@@ -116,7 +116,7 @@ tools:
           properties:
             zone_a_price: {type: number, description: "the subject's current Zone A price"}
             street_median: {type: number, description: "median_zone_a from street_tone"}
-            street_spread: {type: number, description: "spread_mad from street_tone"}
+            street_spread: {type: number, description: "spread from street_tone"}
           required: [zone_a_price, street_median, street_spread]
           additionalProperties: false
         argument: {type: string, minLength: 50}

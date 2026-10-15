@@ -11,8 +11,15 @@ from decimal import ROUND_HALF_UP, Decimal
 SMALL_BUSINESS_LIMIT = 51_000   # below this: small business multiplier
 HIGH_VALUE_FROM = 500_000       # this and above: high-value multiplier
 
-# Retail, hospitality and leisure uses get the lower RHL multipliers.
-RHL_USES = {"shop", "cafe", "restaurant"}
+# Retail, hospitality and leisure uses get the lower RHL multipliers. The mock uses
+# words; real data uses the VOA SCat code ("249" = shops, as in Person 1's data
+# service; add hospitality and leisure codes when we go beyond shops).
+RHL_USES = {"shop", "cafe", "restaurant", "249"}
+
+
+def use_of(valuation: dict) -> str:
+    """What decides the multiplier: the VOA code when the data service gives one."""
+    return valuation.get("use_class") or valuation["use"]
 
 MULTIPLIERS = {
     # band:        (RHL,               other)

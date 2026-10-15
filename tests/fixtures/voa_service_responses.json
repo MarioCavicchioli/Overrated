@@ -1,0 +1,1887 @@
+{
+ "_note": "Invented data in the real service's shapes; see make_voa_fixture.py.",
+ "responses": {
+  "/get_valuation/900000001": {
+   "entry": {
+    "ba_code": "0000",
+    "ba_ref": "REF900000001",
+    "desc_code": "CS",
+    "desc_text": "SHOP AND PREMISES",
+    "uarn": 900000001,
+    "full_address": "1, TEST STREET, LONDON",
+    "postcode": "E8 1AA",
+    "street_key": "TEST STREET|E8 1",
+    "rv": 36000,
+    "scat_code": "249",
+    "scat": "249G"
+   },
+   "summary": {
+    "assessment_ref": "A900000001",
+    "uarn": 900000001,
+    "scheme_ref": "SCH1",
+    "primary_desc": "CS",
+    "total_area": 95,
+    "total_value": 36000,
+    "adopted_rv": 36000,
+    "unit": "m2",
+    "scat_code": "249"
+   },
+   "lines": [
+    {
+     "floor": "Ground",
+     "description": "Retail Zone A",
+     "area": 40,
+     "price": 600,
+     "value": 24000
+    },
+    {
+     "floor": "Ground",
+     "description": "Retail Zone B",
+     "area": 30,
+     "price": 300.0,
+     "value": 9000.0
+    },
+    {
+     "floor": "Ground",
+     "description": "Retail Zone C",
+     "area": 20,
+     "price": 150.0,
+     "value": 3000.0
+    },
+    {
+     "floor": "Ground",
+     "description": "Store",
+     "area": 12,
+     "price": 40,
+     "value": 480
+    }
+   ],
+   "shop": {
+    "uarn": 900000001,
+    "address": "1, TEST STREET, LONDON",
+    "postcode": "E8 1AA",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 36000,
+    "total_area": 95,
+    "adopted_rv": 36000,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 600,
+    "zone_a_area": 40,
+    "itza": 60.0,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "street_tone": {
+    "n": 7,
+    "median": 420,
+    "p25": 410,
+    "p75": 440,
+    "mean": 445,
+    "mad": 10,
+    "segment_key": "TEST STREET|E8 1#SCH1",
+    "spread": 21.0
+   },
+   "z_score": 8.571428571428571,
+   "flags": [
+    "zone_a_above_tone"
+   ],
+   "proposal": null,
+   "latlng": [
+    51.5,
+    -0.07
+   ]
+  },
+  "/get_valuation/900000002": {
+   "entry": {
+    "ba_code": "0000",
+    "ba_ref": "REF900000002",
+    "desc_code": "CS",
+    "desc_text": "SHOP AND PREMISES",
+    "uarn": 900000002,
+    "full_address": "2, TEST STREET, LONDON",
+    "postcode": "E8 1AA",
+    "street_key": "TEST STREET|E8 1",
+    "rv": 21800,
+    "scat_code": "249",
+    "scat": "249G"
+   },
+   "summary": {
+    "assessment_ref": "A900000002",
+    "uarn": 900000002,
+    "scheme_ref": "SCH1",
+    "primary_desc": "CS",
+    "total_area": 70,
+    "total_value": 21800,
+    "adopted_rv": 21800,
+    "unit": "m2",
+    "scat_code": "249"
+   },
+   "lines": [
+    {
+     "floor": "Ground",
+     "description": "Retail Zone A",
+     "area": 38,
+     "price": 420,
+     "value": 15960
+    },
+    {
+     "floor": "Ground",
+     "description": "Retail Zone B",
+     "area": 28,
+     "price": 210.0,
+     "value": 5880.0
+    },
+    {
+     "floor": "Ground",
+     "description": "Store",
+     "area": 12,
+     "price": 40,
+     "value": 480
+    }
+   ],
+   "shop": {
+    "uarn": 900000002,
+    "address": "2, TEST STREET, LONDON",
+    "postcode": "E8 1AA",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 21800,
+    "total_area": 70,
+    "adopted_rv": 21800,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 420,
+    "zone_a_area": 38,
+    "itza": 52.0,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "street_tone": {
+    "n": 7,
+    "median": 420,
+    "p25": 410,
+    "p75": 440,
+    "mean": 445,
+    "mad": 10,
+    "segment_key": "TEST STREET|E8 1#SCH1",
+    "spread": 21.0
+   },
+   "z_score": 0.0,
+   "flags": [],
+   "proposal": null,
+   "latlng": [
+    51.5,
+    -0.07
+   ]
+  },
+  "/get_valuation/900000003": {
+   "entry": {
+    "ba_code": "0000",
+    "ba_ref": "REF900000003",
+    "desc_code": "CS",
+    "desc_text": "SHOP",
+    "uarn": 900000003,
+    "full_address": "3, TEST STREET, LONDON",
+    "postcode": "E8 1AB",
+    "street_key": "TEST STREET|E8 1",
+    "rv": 19600,
+    "scat_code": "249",
+    "scat": "249G"
+   },
+   "summary": {
+    "assessment_ref": "A900000003",
+    "uarn": 900000003,
+    "scheme_ref": "SCH1",
+    "primary_desc": "CS",
+    "total_area": 66,
+    "total_value": 19600,
+    "adopted_rv": 19600,
+    "unit": "m2",
+    "scat_code": "249"
+   },
+   "lines": [
+    {
+     "floor": "Ground",
+     "description": "Retail Zone A",
+     "area": 36,
+     "price": 400,
+     "value": 14400
+    },
+    {
+     "floor": "Ground",
+     "description": "Retail Zone B",
+     "area": 26,
+     "price": 200.0,
+     "value": 5200.0
+    },
+    {
+     "floor": "Ground",
+     "description": "Store",
+     "area": 12,
+     "price": 40,
+     "value": 480
+    }
+   ],
+   "shop": {
+    "uarn": 900000003,
+    "address": "3, TEST STREET, LONDON",
+    "postcode": "E8 1AB",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP",
+    "rv": 19600,
+    "total_area": 66,
+    "adopted_rv": 19600,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 400,
+    "zone_a_area": 36,
+    "itza": 49.0,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "street_tone": {
+    "n": 7,
+    "median": 420,
+    "p25": 410,
+    "p75": 440,
+    "mean": 445,
+    "mad": 10,
+    "segment_key": "TEST STREET|E8 1#SCH1",
+    "spread": 21.0
+   },
+   "z_score": -0.9523809523809523,
+   "flags": [],
+   "proposal": null,
+   "latlng": [
+    51.5,
+    -0.07
+   ]
+  },
+  "/get_valuation/900000004": {
+   "entry": {
+    "ba_code": "0000",
+    "ba_ref": "REF900000004",
+    "desc_code": "CS",
+    "desc_text": "SHOP AND PREMISES",
+    "uarn": 900000004,
+    "full_address": "4, TEST STREET, LONDON",
+    "postcode": "E8 1AB",
+    "street_key": "TEST STREET|E8 1",
+    "rv": 26200,
+    "scat_code": "249",
+    "scat": "249G"
+   },
+   "summary": {
+    "assessment_ref": "A900000004",
+    "uarn": 900000004,
+    "scheme_ref": "SCH1",
+    "primary_desc": "CS",
+    "total_area": 88,
+    "total_value": 26200,
+    "adopted_rv": 26200,
+    "unit": "m2",
+    "scat_code": "249"
+   },
+   "lines": [
+    {
+     "floor": "Ground",
+     "description": "Retail Zone A",
+     "area": 42,
+     "price": 440,
+     "value": 18480
+    },
+    {
+     "floor": "Ground",
+     "description": "Retail Zone B",
+     "area": 30,
+     "price": 220.0,
+     "value": 6600.0
+    },
+    {
+     "floor": "Ground",
+     "description": "Retail Zone C",
+     "area": 10,
+     "price": 110.0,
+     "value": 1100.0
+    },
+    {
+     "floor": "Ground",
+     "description": "Store",
+     "area": 12,
+     "price": 40,
+     "value": 480
+    }
+   ],
+   "shop": {
+    "uarn": 900000004,
+    "address": "4, TEST STREET, LONDON",
+    "postcode": "E8 1AB",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 26200,
+    "total_area": 88,
+    "adopted_rv": 26200,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 440,
+    "zone_a_area": 42,
+    "itza": 59.5,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "street_tone": {
+    "n": 7,
+    "median": 420,
+    "p25": 410,
+    "p75": 440,
+    "mean": 445,
+    "mad": 10,
+    "segment_key": "TEST STREET|E8 1#SCH1",
+    "spread": 21.0
+   },
+   "z_score": 0.9523809523809523,
+   "flags": [],
+   "proposal": null,
+   "latlng": [
+    51.5,
+    -0.07
+   ]
+  },
+  "/get_valuation/900000005": {
+   "entry": {
+    "ba_code": "0000",
+    "ba_ref": "REF900000005",
+    "desc_code": "CS",
+    "desc_text": "SHOP AND PREMISES",
+    "uarn": 900000005,
+    "full_address": "5, TEST STREET, LONDON",
+    "postcode": "E8 1AC",
+    "street_key": "TEST STREET|E8 1",
+    "rv": 22600,
+    "scat_code": "249",
+    "scat": "249G"
+   },
+   "summary": {
+    "assessment_ref": "A900000005",
+    "uarn": 900000005,
+    "scheme_ref": "SCH1",
+    "primary_desc": "CS",
+    "total_area": 72,
+    "total_value": 22600,
+    "adopted_rv": 22600,
+    "unit": "m2",
+    "scat_code": "249"
+   },
+   "lines": [
+    {
+     "floor": "Ground",
+     "description": "Retail Zone A",
+     "area": 40,
+     "price": 410,
+     "value": 16400
+    },
+    {
+     "floor": "Ground",
+     "description": "Retail Zone B",
+     "area": 30,
+     "price": 205.0,
+     "value": 6150.0
+    },
+    {
+     "floor": "Ground",
+     "description": "Store",
+     "area": 12,
+     "price": 40,
+     "value": 480
+    }
+   ],
+   "shop": {
+    "uarn": 900000005,
+    "address": "5, TEST STREET, LONDON",
+    "postcode": "E8 1AC",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 22600,
+    "total_area": 72,
+    "adopted_rv": 22600,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 410,
+    "zone_a_area": 40,
+    "itza": 55.0,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "street_tone": {
+    "n": 7,
+    "median": 420,
+    "p25": 410,
+    "p75": 440,
+    "mean": 445,
+    "mad": 10,
+    "segment_key": "TEST STREET|E8 1#SCH1",
+    "spread": 21.0
+   },
+   "z_score": -0.47619047619047616,
+   "flags": [],
+   "proposal": null,
+   "latlng": [
+    51.5,
+    -0.07
+   ]
+  },
+  "/get_valuation/900000006": {
+   "entry": {
+    "ba_code": "0000",
+    "ba_ref": "REF900000006",
+    "desc_code": "CS",
+    "desc_text": "SHOP AND PREMISES",
+    "uarn": 900000006,
+    "full_address": "6, TEST STREET, LONDON",
+    "postcode": "E8 1AC",
+    "street_key": "TEST STREET|E8 1",
+    "rv": 62400,
+    "scat_code": "249",
+    "scat": "249G"
+   },
+   "summary": {
+    "assessment_ref": "A900000006",
+    "uarn": 900000006,
+    "scheme_ref": "SCH1",
+    "primary_desc": "CS",
+    "total_area": 260,
+    "total_value": 62400,
+    "adopted_rv": 62400,
+    "unit": "m2",
+    "scat_code": "249"
+   },
+   "lines": [
+    {
+     "floor": "Ground",
+     "description": "Retail Zone A",
+     "area": 90,
+     "price": 430,
+     "value": 38700
+    },
+    {
+     "floor": "Ground",
+     "description": "Retail Zone B",
+     "area": 80,
+     "price": 215.0,
+     "value": 17200.0
+    },
+    {
+     "floor": "Ground",
+     "description": "Retail Zone C",
+     "area": 60,
+     "price": 107.5,
+     "value": 6450.0
+    },
+    {
+     "floor": "Ground",
+     "description": "Store",
+     "area": 12,
+     "price": 40,
+     "value": 480
+    }
+   ],
+   "shop": {
+    "uarn": 900000006,
+    "address": "6, TEST STREET, LONDON",
+    "postcode": "E8 1AC",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 62400,
+    "total_area": 260,
+    "adopted_rv": 62400,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 430,
+    "zone_a_area": 90,
+    "itza": 145.0,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "street_tone": {
+    "n": 7,
+    "median": 420,
+    "p25": 410,
+    "p75": 440,
+    "mean": 445,
+    "mad": 10,
+    "segment_key": "TEST STREET|E8 1#SCH1",
+    "spread": 21.0
+   },
+   "z_score": 0.47619047619047616,
+   "flags": [],
+   "proposal": null,
+   "latlng": [
+    51.5,
+    -0.07
+   ]
+  },
+  "/get_valuation/900000007": {
+   "entry": {
+    "ba_code": "0000",
+    "ba_ref": "REF900000007",
+    "desc_code": "CS",
+    "desc_text": "SHOP AND PREMISES",
+    "uarn": 900000007,
+    "full_address": "7, TEST STREET, LONDON",
+    "postcode": "E8 1AD",
+    "street_key": "TEST STREET|E8 1",
+    "rv": 36000,
+    "scat_code": "249",
+    "scat": "249G"
+   },
+   "summary": {
+    "assessment_ref": "A900000007",
+    "uarn": 900000007,
+    "scheme_ref": "SCH2",
+    "primary_desc": "CS",
+    "total_area": 55,
+    "total_value": 36000,
+    "adopted_rv": 36000,
+    "unit": "m2",
+    "scat_code": "249"
+   },
+   "lines": [
+    {
+     "floor": "Ground",
+     "description": "Retail Zone A",
+     "area": 30,
+     "price": 900,
+     "value": 27000
+    },
+    {
+     "floor": "Ground",
+     "description": "Retail Zone B",
+     "area": 20,
+     "price": 450.0,
+     "value": 9000.0
+    },
+    {
+     "floor": "Ground",
+     "description": "Store",
+     "area": 12,
+     "price": 40,
+     "value": 480
+    }
+   ],
+   "shop": {
+    "uarn": 900000007,
+    "address": "7, TEST STREET, LONDON",
+    "postcode": "E8 1AD",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 36000,
+    "total_area": 55,
+    "adopted_rv": 36000,
+    "scheme_ref": "SCH2",
+    "zone_a_price": 900,
+    "zone_a_area": 30,
+    "itza": 40.0,
+    "segment_key": "TEST STREET|E8 1#SCH2"
+   },
+   "street_tone": {
+    "n": 1,
+    "median": 900,
+    "p25": 900,
+    "p75": 900,
+    "mean": 900,
+    "mad": 0,
+    "segment_key": "TEST STREET|E8 1#SCH2",
+    "spread": 45.0
+   },
+   "z_score": 0.0,
+   "flags": [],
+   "proposal": null,
+   "latlng": [
+    51.5,
+    -0.07
+   ]
+  },
+  "/get_valuation/900000008": {
+   "entry": {
+    "ba_code": "0000",
+    "ba_ref": "REF900000008",
+    "desc_code": "CS",
+    "desc_text": "SHOP AND PREMISES",
+    "uarn": 900000008,
+    "full_address": "8, TEST STREET, LONDON",
+    "postcode": "E8 9ZZ",
+    "street_key": "TEST STREET|E8 1",
+    "rv": 22200,
+    "scat_code": "249",
+    "scat": "249G"
+   },
+   "summary": {
+    "assessment_ref": "A900000008",
+    "uarn": 900000008,
+    "scheme_ref": "SCH1",
+    "primary_desc": "CS",
+    "total_area": 71,
+    "total_value": 22200,
+    "adopted_rv": 22200,
+    "unit": "m2",
+    "scat_code": "249"
+   },
+   "lines": [
+    {
+     "floor": "Ground",
+     "description": "Retail Zone A",
+     "area": 39,
+     "price": 415,
+     "value": 16185
+    },
+    {
+     "floor": "Ground",
+     "description": "Retail Zone B",
+     "area": 29,
+     "price": 207.5,
+     "value": 6017.5
+    },
+    {
+     "floor": "Ground",
+     "description": "Store",
+     "area": 12,
+     "price": 40,
+     "value": 480
+    }
+   ],
+   "shop": {
+    "uarn": 900000008,
+    "address": "8, TEST STREET, LONDON",
+    "postcode": "E8 9ZZ",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 22200,
+    "total_area": 71,
+    "adopted_rv": 22200,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 415,
+    "zone_a_area": 39,
+    "itza": 53.5,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "street_tone": {
+    "n": 7,
+    "median": 420,
+    "p25": 410,
+    "p75": 440,
+    "mean": 445,
+    "mad": 10,
+    "segment_key": "TEST STREET|E8 1#SCH1",
+    "spread": 21.0
+   },
+   "z_score": -0.23809523809523808,
+   "flags": [],
+   "proposal": null,
+   "latlng": null
+  },
+  "/comparables/900000001": {
+   "subject": {
+    "uarn": 900000001,
+    "address": "1, TEST STREET, LONDON",
+    "postcode": "E8 1AA",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 36000,
+    "total_area": 95,
+    "adopted_rv": 36000,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 600,
+    "zone_a_area": 40,
+    "itza": 60.0,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "comparables": [
+    {
+     "uarn": 900000002,
+     "address": "2, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 21800,
+     "zone_a_price": 420,
+     "itza": 52.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000003,
+     "address": "3, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP",
+     "rv": 19600,
+     "zone_a_price": 400,
+     "itza": 49.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000004,
+     "address": "4, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 26200,
+     "zone_a_price": 440,
+     "itza": 59.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000005,
+     "address": "5, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22600,
+     "zone_a_price": 410,
+     "itza": 55.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000006,
+     "address": "6, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 62400,
+     "zone_a_price": 430,
+     "itza": 145.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000008,
+     "address": "8, TEST STREET, LONDON",
+     "postcode": "E8 9ZZ",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22200,
+     "zone_a_price": 415,
+     "itza": 53.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": null
+    },
+    {
+     "uarn": 900000007,
+     "address": "7, TEST STREET, LONDON",
+     "postcode": "E8 1AD",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH2",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 900,
+     "itza": 40.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 90
+    }
+   ]
+  },
+  "/comparables/900000002": {
+   "subject": {
+    "uarn": 900000002,
+    "address": "2, TEST STREET, LONDON",
+    "postcode": "E8 1AA",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 21800,
+    "total_area": 70,
+    "adopted_rv": 21800,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 420,
+    "zone_a_area": 38,
+    "itza": 52.0,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "comparables": [
+    {
+     "uarn": 900000001,
+     "address": "1, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 600,
+     "itza": 60.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000003,
+     "address": "3, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP",
+     "rv": 19600,
+     "zone_a_price": 400,
+     "itza": 49.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000004,
+     "address": "4, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 26200,
+     "zone_a_price": 440,
+     "itza": 59.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000005,
+     "address": "5, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22600,
+     "zone_a_price": 410,
+     "itza": 55.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000006,
+     "address": "6, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 62400,
+     "zone_a_price": 430,
+     "itza": 145.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000008,
+     "address": "8, TEST STREET, LONDON",
+     "postcode": "E8 9ZZ",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22200,
+     "zone_a_price": 415,
+     "itza": 53.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": null
+    },
+    {
+     "uarn": 900000007,
+     "address": "7, TEST STREET, LONDON",
+     "postcode": "E8 1AD",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH2",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 900,
+     "itza": 40.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 90
+    }
+   ]
+  },
+  "/comparables/900000003": {
+   "subject": {
+    "uarn": 900000003,
+    "address": "3, TEST STREET, LONDON",
+    "postcode": "E8 1AB",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP",
+    "rv": 19600,
+    "total_area": 66,
+    "adopted_rv": 19600,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 400,
+    "zone_a_area": 36,
+    "itza": 49.0,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "comparables": [
+    {
+     "uarn": 900000001,
+     "address": "1, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 600,
+     "itza": 60.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000002,
+     "address": "2, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 21800,
+     "zone_a_price": 420,
+     "itza": 52.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000004,
+     "address": "4, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 26200,
+     "zone_a_price": 440,
+     "itza": 59.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000005,
+     "address": "5, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22600,
+     "zone_a_price": 410,
+     "itza": 55.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000006,
+     "address": "6, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 62400,
+     "zone_a_price": 430,
+     "itza": 145.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000008,
+     "address": "8, TEST STREET, LONDON",
+     "postcode": "E8 9ZZ",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22200,
+     "zone_a_price": 415,
+     "itza": 53.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": null
+    },
+    {
+     "uarn": 900000007,
+     "address": "7, TEST STREET, LONDON",
+     "postcode": "E8 1AD",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH2",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 900,
+     "itza": 40.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 90
+    }
+   ]
+  },
+  "/comparables/900000004": {
+   "subject": {
+    "uarn": 900000004,
+    "address": "4, TEST STREET, LONDON",
+    "postcode": "E8 1AB",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 26200,
+    "total_area": 88,
+    "adopted_rv": 26200,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 440,
+    "zone_a_area": 42,
+    "itza": 59.5,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "comparables": [
+    {
+     "uarn": 900000001,
+     "address": "1, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 600,
+     "itza": 60.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000002,
+     "address": "2, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 21800,
+     "zone_a_price": 420,
+     "itza": 52.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000003,
+     "address": "3, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP",
+     "rv": 19600,
+     "zone_a_price": 400,
+     "itza": 49.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000005,
+     "address": "5, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22600,
+     "zone_a_price": 410,
+     "itza": 55.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000006,
+     "address": "6, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 62400,
+     "zone_a_price": 430,
+     "itza": 145.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000008,
+     "address": "8, TEST STREET, LONDON",
+     "postcode": "E8 9ZZ",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22200,
+     "zone_a_price": 415,
+     "itza": 53.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": null
+    },
+    {
+     "uarn": 900000007,
+     "address": "7, TEST STREET, LONDON",
+     "postcode": "E8 1AD",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH2",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 900,
+     "itza": 40.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 90
+    }
+   ]
+  },
+  "/comparables/900000005": {
+   "subject": {
+    "uarn": 900000005,
+    "address": "5, TEST STREET, LONDON",
+    "postcode": "E8 1AC",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 22600,
+    "total_area": 72,
+    "adopted_rv": 22600,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 410,
+    "zone_a_area": 40,
+    "itza": 55.0,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "comparables": [
+    {
+     "uarn": 900000001,
+     "address": "1, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 600,
+     "itza": 60.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000002,
+     "address": "2, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 21800,
+     "zone_a_price": 420,
+     "itza": 52.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000003,
+     "address": "3, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP",
+     "rv": 19600,
+     "zone_a_price": 400,
+     "itza": 49.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000004,
+     "address": "4, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 26200,
+     "zone_a_price": 440,
+     "itza": 59.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000006,
+     "address": "6, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 62400,
+     "zone_a_price": 430,
+     "itza": 145.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000008,
+     "address": "8, TEST STREET, LONDON",
+     "postcode": "E8 9ZZ",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22200,
+     "zone_a_price": 415,
+     "itza": 53.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": null
+    },
+    {
+     "uarn": 900000007,
+     "address": "7, TEST STREET, LONDON",
+     "postcode": "E8 1AD",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH2",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 900,
+     "itza": 40.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 90
+    }
+   ]
+  },
+  "/comparables/900000006": {
+   "subject": {
+    "uarn": 900000006,
+    "address": "6, TEST STREET, LONDON",
+    "postcode": "E8 1AC",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 62400,
+    "total_area": 260,
+    "adopted_rv": 62400,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 430,
+    "zone_a_area": 90,
+    "itza": 145.0,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "comparables": [
+    {
+     "uarn": 900000001,
+     "address": "1, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 600,
+     "itza": 60.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000002,
+     "address": "2, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 21800,
+     "zone_a_price": 420,
+     "itza": 52.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000003,
+     "address": "3, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP",
+     "rv": 19600,
+     "zone_a_price": 400,
+     "itza": 49.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000004,
+     "address": "4, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 26200,
+     "zone_a_price": 440,
+     "itza": 59.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000005,
+     "address": "5, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22600,
+     "zone_a_price": 410,
+     "itza": 55.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000008,
+     "address": "8, TEST STREET, LONDON",
+     "postcode": "E8 9ZZ",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22200,
+     "zone_a_price": 415,
+     "itza": 53.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": null
+    },
+    {
+     "uarn": 900000007,
+     "address": "7, TEST STREET, LONDON",
+     "postcode": "E8 1AD",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH2",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 900,
+     "itza": 40.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 90
+    }
+   ]
+  },
+  "/comparables/900000007": {
+   "subject": {
+    "uarn": 900000007,
+    "address": "7, TEST STREET, LONDON",
+    "postcode": "E8 1AD",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 36000,
+    "total_area": 55,
+    "adopted_rv": 36000,
+    "scheme_ref": "SCH2",
+    "zone_a_price": 900,
+    "zone_a_area": 30,
+    "itza": 40.0,
+    "segment_key": "TEST STREET|E8 1#SCH2"
+   },
+   "comparables": [
+    {
+     "uarn": 900000001,
+     "address": "1, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 600,
+     "itza": 60.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000002,
+     "address": "2, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 21800,
+     "zone_a_price": 420,
+     "itza": 52.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000003,
+     "address": "3, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP",
+     "rv": 19600,
+     "zone_a_price": 400,
+     "itza": 49.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000004,
+     "address": "4, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 26200,
+     "zone_a_price": 440,
+     "itza": 59.5,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000005,
+     "address": "5, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22600,
+     "zone_a_price": 410,
+     "itza": 55.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000006,
+     "address": "6, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 62400,
+     "zone_a_price": 430,
+     "itza": 145.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000008,
+     "address": "8, TEST STREET, LONDON",
+     "postcode": "E8 9ZZ",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22200,
+     "zone_a_price": 415,
+     "itza": 53.5,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": null
+    }
+   ]
+  },
+  "/comparables/900000008": {
+   "subject": {
+    "uarn": 900000008,
+    "address": "8, TEST STREET, LONDON",
+    "postcode": "E8 9ZZ",
+    "postcode_sector": "E8 1",
+    "street_key": "TEST STREET|E8 1",
+    "street": "TEST STREET",
+    "town": "LONDON",
+    "ba_code": "0000",
+    "scat_code": "249",
+    "desc_text": "SHOP AND PREMISES",
+    "rv": 22200,
+    "total_area": 71,
+    "adopted_rv": 22200,
+    "scheme_ref": "SCH1",
+    "zone_a_price": 415,
+    "zone_a_area": 39,
+    "itza": 53.5,
+    "segment_key": "TEST STREET|E8 1#SCH1"
+   },
+   "comparables": [
+    {
+     "uarn": 900000001,
+     "address": "1, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 600,
+     "itza": 60.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000002,
+     "address": "2, TEST STREET, LONDON",
+     "postcode": "E8 1AA",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 21800,
+     "zone_a_price": 420,
+     "itza": 52.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 0
+    },
+    {
+     "uarn": 900000003,
+     "address": "3, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP",
+     "rv": 19600,
+     "zone_a_price": 400,
+     "itza": 49.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000004,
+     "address": "4, TEST STREET, LONDON",
+     "postcode": "E8 1AB",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 26200,
+     "zone_a_price": 440,
+     "itza": 59.5,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 60
+    },
+    {
+     "uarn": 900000005,
+     "address": "5, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 22600,
+     "zone_a_price": 410,
+     "itza": 55.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000006,
+     "address": "6, TEST STREET, LONDON",
+     "postcode": "E8 1AC",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "use": "SHOP AND PREMISES",
+     "rv": 62400,
+     "zone_a_price": 430,
+     "itza": 145.0,
+     "same_segment": true,
+     "same_street": true,
+     "distance_m": 140
+    },
+    {
+     "uarn": 900000007,
+     "address": "7, TEST STREET, LONDON",
+     "postcode": "E8 1AD",
+     "street_key": "TEST STREET|E8 1",
+     "segment_key": "TEST STREET|E8 1#SCH2",
+     "use": "SHOP AND PREMISES",
+     "rv": 36000,
+     "zone_a_price": 900,
+     "itza": 40.0,
+     "same_segment": false,
+     "same_street": true,
+     "distance_m": 90
+    }
+   ]
+  },
+  "/street_tone?segment_key=TEST STREET|E8 1#SCH1": {
+   "street_key": "TEST STREET|E8 1",
+   "scat_code": "249",
+   "year": "2026",
+   "segments": [
+    {
+     "segment_key": "TEST STREET|E8 1#SCH1",
+     "tone": {
+      "n": 7,
+      "median": 420,
+      "p25": 410,
+      "p75": 440,
+      "mean": 445,
+      "mad": 10,
+      "segment_key": "TEST STREET|E8 1#SCH1",
+      "spread": 21.0
+     },
+     "shops": [
+      {
+       "uarn": 900000001,
+       "address": "1, TEST STREET, LONDON",
+       "postcode": "E8 1AA",
+       "rv": 36000,
+       "zone_a_price": 600,
+       "itza": 60.0,
+       "z_score": 8.57
+      },
+      {
+       "uarn": 900000002,
+       "address": "2, TEST STREET, LONDON",
+       "postcode": "E8 1AA",
+       "rv": 21800,
+       "zone_a_price": 420,
+       "itza": 52.0,
+       "z_score": 0.0
+      },
+      {
+       "uarn": 900000003,
+       "address": "3, TEST STREET, LONDON",
+       "postcode": "E8 1AB",
+       "rv": 19600,
+       "zone_a_price": 400,
+       "itza": 49.0,
+       "z_score": -0.95
+      },
+      {
+       "uarn": 900000004,
+       "address": "4, TEST STREET, LONDON",
+       "postcode": "E8 1AB",
+       "rv": 26200,
+       "zone_a_price": 440,
+       "itza": 59.5,
+       "z_score": 0.95
+      },
+      {
+       "uarn": 900000005,
+       "address": "5, TEST STREET, LONDON",
+       "postcode": "E8 1AC",
+       "rv": 22600,
+       "zone_a_price": 410,
+       "itza": 55.0,
+       "z_score": -0.48
+      },
+      {
+       "uarn": 900000006,
+       "address": "6, TEST STREET, LONDON",
+       "postcode": "E8 1AC",
+       "rv": 62400,
+       "zone_a_price": 430,
+       "itza": 145.0,
+       "z_score": 0.48
+      },
+      {
+       "uarn": 900000008,
+       "address": "8, TEST STREET, LONDON",
+       "postcode": "E8 9ZZ",
+       "rv": 22200,
+       "zone_a_price": 415,
+       "itza": 53.5,
+       "z_score": -0.24
+      }
+     ]
+    }
+   ]
+  },
+  "/street_tone?segment_key=TEST STREET|E8 1#SCH2": {
+   "street_key": "TEST STREET|E8 1",
+   "scat_code": "249",
+   "year": "2026",
+   "segments": [
+    {
+     "segment_key": "TEST STREET|E8 1#SCH2",
+     "tone": {
+      "n": 1,
+      "median": 900,
+      "p25": 900,
+      "p75": 900,
+      "mean": 900,
+      "mad": 0,
+      "segment_key": "TEST STREET|E8 1#SCH2",
+      "spread": 45.0
+     },
+     "shops": [
+      {
+       "uarn": 900000007,
+       "address": "7, TEST STREET, LONDON",
+       "postcode": "E8 1AD",
+       "rv": 36000,
+       "zone_a_price": 900,
+       "itza": 40.0,
+       "z_score": 0.0
+      }
+     ]
+    }
+   ]
+  },
+  "/search_properties?q=TEST STREET": [
+   {
+    "uarn": 900000001,
+    "address": "1, TEST STREET, LONDON",
+    "postcode": "E8 1AA",
+    "street_key": "TEST STREET|E8 1",
+    "use": "SHOP AND PREMISES",
+    "scat_code": "249",
+    "rv": 36000,
+    "zone_a_price": 600
+   },
+   {
+    "uarn": 900000002,
+    "address": "2, TEST STREET, LONDON",
+    "postcode": "E8 1AA",
+    "street_key": "TEST STREET|E8 1",
+    "use": "SHOP AND PREMISES",
+    "scat_code": "249",
+    "rv": 21800,
+    "zone_a_price": 420
+   },
+   {
+    "uarn": 900000003,
+    "address": "3, TEST STREET, LONDON",
+    "postcode": "E8 1AB",
+    "street_key": "TEST STREET|E8 1",
+    "use": "SHOP",
+    "scat_code": "249",
+    "rv": 19600,
+    "zone_a_price": 400
+   },
+   {
+    "uarn": 900000004,
+    "address": "4, TEST STREET, LONDON",
+    "postcode": "E8 1AB",
+    "street_key": "TEST STREET|E8 1",
+    "use": "SHOP AND PREMISES",
+    "scat_code": "249",
+    "rv": 26200,
+    "zone_a_price": 440
+   },
+   {
+    "uarn": 900000005,
+    "address": "5, TEST STREET, LONDON",
+    "postcode": "E8 1AC",
+    "street_key": "TEST STREET|E8 1",
+    "use": "SHOP AND PREMISES",
+    "scat_code": "249",
+    "rv": 22600,
+    "zone_a_price": 410
+   },
+   {
+    "uarn": 900000006,
+    "address": "6, TEST STREET, LONDON",
+    "postcode": "E8 1AC",
+    "street_key": "TEST STREET|E8 1",
+    "use": "SHOP AND PREMISES",
+    "scat_code": "249",
+    "rv": 62400,
+    "zone_a_price": 430
+   },
+   {
+    "uarn": 900000007,
+    "address": "7, TEST STREET, LONDON",
+    "postcode": "E8 1AD",
+    "street_key": "TEST STREET|E8 1",
+    "use": "SHOP AND PREMISES",
+    "scat_code": "249",
+    "rv": 36000,
+    "zone_a_price": 900
+   },
+   {
+    "uarn": 900000008,
+    "address": "8, TEST STREET, LONDON",
+    "postcode": "E8 9ZZ",
+    "street_key": "TEST STREET|E8 1",
+    "use": "SHOP AND PREMISES",
+    "scat_code": "249",
+    "rv": 22200,
+    "zone_a_price": 415
+   }
+  ]
+ }
+}

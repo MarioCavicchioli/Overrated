@@ -23,7 +23,7 @@ from agents.advocate.handlers import AGENT, AdvocateHandlers
 from agents.builder.checks import COMP_MAX_DISTANCE_M, spreads_from_median
 from orchestrator import budget
 from orchestrator.config import anthropic_client, env_int, load_env
-from orchestrator.data_client import DataClient
+from orchestrator.data_client import DataClient, make_data_client
 from orchestrator.sessions import SessionResult, resource_id, run_session
 from orchestrator.store import Store, get_store
 
@@ -65,7 +65,7 @@ def pack_facts(pack: dict[str, Any], data: DataClient) -> dict[str, Any]:
     return {
         "subject_zone_a_price": price,
         "street_median": tone["median_zone_a"],
-        "street_spread": tone["spread_mad"],
+        "street_spread": tone["spread"],
         "spreads_from_street_median": round(spreads_from_median(price, tone), 2),
         "nearest_same_use": None if nearest is None else {
             "uarn": nearest["uarn"], "zone_a_price": nearest["zone_a_price"],
@@ -122,7 +122,7 @@ def run_advocate(case_id: str, *, client=None, store: Store | None = None,
     AdvocateError if no verdict was written."""
     load_env()
     store = store or get_store()
-    data = data or DataClient()
+    data = data or make_data_client()
     client = client or anthropic_client()
     before = len(store.list_verdicts(case_id))
     verdict, result = review_pack(client, store, data, case_id, verbose=verbose)
