@@ -1,0 +1,49 @@
+OVERRATED - AGENT DESIGN
+
+One line: AI agents that find shops overpaying business rates, prove it with the VOA's own numbers, and run the Check and Challenge until the bill comes down. No win, no fee.
+
+WHY IT WORKS
+Every shop in England is valued by "zoning": the first 6.1 m from the window (Zone A) at a full price per m2, deeper strips at a half, a quarter and an eighth. Similar shops on the same stretch of street should carry the same Zone A price. The VOA sets about 2 million values at once, so some shops are priced well above their neighbours. Those owners overpay every year until someone challenges it.
+
+THE AGENTS (Claude Managed Agents, one shared workspace with one spend cap)
+
+1. Scout (Opus 5.5, multi-agent coordinator)
+   - Sweeps a whole borough through the data service, street by street, and saves a checkpoint after each street so a restarted session resumes.
+   - Flags a shop only when it is above BOTH its street segment (street + postcode sector + VOA valuation scheme) and its 4 nearest same-use neighbours by house number. The second test came from today's runs: the VOA deliberately prices blocks differently along long streets, so a shop that matches its neighbours is not out of line.
+   - Writes candidates, events and run counters to Supabase, then hands each candidate to a Case builder thread inside its own session ("Candidate UARN: ...", at most 10 at a time).
+   - Its host loop answers the builder's custom tools through the orchestrator's router, so no keys or network reach the builder's sandbox.
+
+2. Case builder (Sonnet 5.5, custom tools only, runs as threads in the Scout's session)
+   - Reads the valuation, the street tone and the eligible comparables (same use, within 200 m, half to double the floor area) from the data service.
+   - Proposes RV = ITZA x the median Zone A of the comparables and writes the plain-English argument.
+   - Code then checks every comparable against the data service, recomputes the zoning maths and the saving at the right 2026 multiplier band, and rejects anything that does not match. The builder fixes the pack or calls no_case with its reason.
+
+3. VOA advocate (Opus 5.5, its own session per pack)
+   - Sees only the pack and read-only data tools, never the builder's notes.
+   - Argues the VOA's side (weaker comparables, size, corner or frontage, priced runs, maths errors) and returns survive or kill, with every reason citing a real VOA record.
+
+4. Orchestrator (FastAPI)
+   - Watches Supabase: a new pack starts an advocate session; a survive verdict waits for the owner's approval; approval hands the case to the Caseworker.
+   - Logs every session's tokens and list cost to the events feed.
+
+5. Caseworker (short sessions, GitHub Actions schedule)
+   - Woken by a VOA reply, a deadline or the daily sweep. Reads the case row, decides the next step (accept, Challenge, Tribunal), drafts the reply and sets the next deadline. The VOA side is mocked: no real filings.
+
+6. Playbook keeper (nightly)
+   - Proposes the next version of the Scout's rules. It goes live only if the eval agent scores it at least as high on held-out streets.
+
+7. Eval agent (code first)
+   - Backtest: the Scout's ranking runs on the 2023 list exactly as compiled on 30 Mar 2023, then is scored against what really happened (values the VOA later cut, with floor area unchanged and the cut backdated to 1 Apr 2023: 7,023 of 466,856 shops).
+   - Score: lift at 50 = hit rate of the Scout's top 50 / hit rate of all shops on the same streets. Streets are split in half; rules are tuned on one half and reported on the other.
+   - Held-out lift 1.57 (default rules) and 1.59 (after the hill climb); flagged candidates are about 3x as likely to be cut as an average shop.
+
+DATA AND GUARDRAILS
+- Data service: FastAPI + DuckDB over the VOA 2026 and 2023 rating lists and summary valuations (460k shops with a Zone A price), behind an API key. Every comparable and every number comes from it; agents never invent one.
+- Supabase (Postgres + Realtime) is the shared state and the live feed: every agent writes an events row for each step.
+- Secrets live in Managed Agents vaults and are substituted when a request leaves the sandbox; the sandbox never sees them.
+- Every session has a hard spend budget. A full borough sweep with 5 builder threads cost $0.70 today.
+- VOA data is used under the VOA's restricted licence for rating purposes only and is never published; filings to the VOA are mocked.
+
+TODAY'S RUNS
+- Hackney: 2,336 shops scored. 34 were above their segment, but 31 failed the neighbour test (28 priced exactly like their neighbours); 3 passed both. The 2 handed to the builder came back no case (a same-priced pair; a street with no price spread).
+- Lambeth: 2,423 shops scored and 48 candidates flagged. The 5 highest were handed to builders (a test limit): 3 evidence packs passed the code checks (proposed savings of £15k to £33k a year each) and 2 came back as honest "no case" decisions with reasons.
