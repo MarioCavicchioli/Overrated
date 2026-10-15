@@ -120,6 +120,72 @@ def test_watcher_and_schedules_leave_other_teams_refs_alone(store, monkeypatch):
     assert s.tick() == [] and not any(k.startswith("caseworker_wake") for k in kinds(store))
 
 
+# -- a new pack version for an open case -----------------------------------
+def open_case_on_v1(store):
+    add_pack(store, "c_0101", "1001008")
+    p = Pipeline(store, run_advocate=lambda cid: verdict(store, cid, "survive"),
+                 advocate_available=True)
+    p.judge("c_0101")
+    return p, store.get_case("c_0101")
+
+
+def new_version(store, saving=1800):
+    return store.insert_pack_version({
+        "case_id": "c_0101", "uarn": "1001008", "pack": {"case_id": "c_0101"},
+        "comparables": [], "proposed_rv": 26000, "annual_saving": saving,
+        "argument": "y" * 50, "version": "builder-v1"})
+
+
+def test_new_version_takes_the_ref_and_the_case(store):
+    _, case_v1 = open_case_on_v1(store)
+    v1 = store.get_pack("c_0101")
+    assert new_version(store) == 2
+    v2 = store.get_pack("c_0101")
+    assert v2["pack_version"] == 2 and v2["pack_id"] != v1["pack_id"] and v2["status"] == "built"
+    old = store._one("packs", [("pack_id", "eq", v1["pack_id"])])
+    assert old["case_ref"] is None and old["status"] == "superseded"
+    case = store.get_case("c_0101")
+    assert case["case_uuid"] == v2["case_uuid"] and case["pack_id"] == v2["pack_id"]
+    assert case["history"] == case_v1["history"]          # the case itself carries on
+    assert store.list_case_ids() == ["c_0101"]            # one pack holds the ref
+    assert len(store.list_verdicts("c_0101")) == 0        # v1's verdict stays with v1
+
+
+def test_new_version_survives_again(store):
+    p, _ = open_case_on_v1(store)
+    new_version(store, saving=1800)
+    assert p.tick() == ["c_0101"]                          # the watcher judges v2
+    p.judge("c_0101")
+    case = store.get_case("c_0101")
+    assert case["stage"] == "waiting_owner"
+    assert case["history"][-1]["type"] == "rechecked" and "£1,800" in case["history"][-1]["text"]
+    assert store.get_pack("c_0101")["status"] == "waiting_owner"
+    assert kinds(store).count("case_opened") == 1 and "case_rechecked" in kinds(store)
+
+
+def test_new_version_killed_closes_the_case(store):
+    p, _ = open_case_on_v1(store)
+    new_version(store)
+    p.run_advocate = lambda cid: verdict(store, cid, "kill", [
+        {"reason": "An adult gaming centre was used as a shop", "voa_record": "112699075"}])
+    p.judge("c_0101")
+    case = store.get_case("c_0101")
+    assert case["stage"] == "closed" and "adult gaming centre" in case["history"][-1]["text"]
+    assert store.get_candidate("1001008")["status"] == "killed"
+    assert store.get_pack("c_0101")["status"] == "killed"
+
+
+def test_kill_after_owner_approval_goes_to_a_person(store):
+    from orchestrator.cases import approve_case
+    p, _ = open_case_on_v1(store)
+    approve_case(store, "c_0101", "4471-2290-11", True)
+    new_version(store)
+    p.run_advocate = lambda cid: verdict(store, cid, "kill")
+    p.judge("c_0101")
+    assert store.get_case("c_0101")["stage"] == "needs_human"
+    assert "case_needs_human" in kinds(store)
+
+
 # -- customer requests -> standalone builder -------------------------------
 def customer(store, uarn="1001008", flags=("customer_request",), status="building_pack"):
     store.upsert_candidate({"uarn": uarn, "address": "137 Mare Street", "rv": 30000,

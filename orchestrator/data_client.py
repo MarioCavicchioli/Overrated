@@ -165,7 +165,10 @@ class VoaDataClient(DataClient):
             dist = row.get("distance_m")
             if max_distance is not None and (dist is None or dist > max_distance):
                 continue
-            out.append({**self._identity(row), "distance_m": dist})
+            # The service filters comparables on the subject's scheme code in SQL and
+            # doesn't return it, so every row has the subject's code.
+            out.append({**self._identity(row), "use_class": row.get("scat_code") or subject_class,
+                        "distance_m": dist})
         # No distance when a postcode can't be located: those go last.
         out.sort(key=lambda c: c["distance_m"] if c["distance_m"] is not None else float("inf"))
         return out[:limit] if limit else out

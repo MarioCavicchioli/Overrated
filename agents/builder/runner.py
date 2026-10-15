@@ -34,21 +34,23 @@ class BuilderError(RuntimeError):
 
 
 def build_candidate(client, store: Store, data: DataClient, uarn: str,
-                    verbose: bool = True) -> tuple[str, SessionResult]:
+                    verbose: bool = True, run_id: str | None = None,
+                    revise_ref: str | None = None) -> tuple[str, SessionResult]:
     """One builder session for a candidate already in the store. Returns the
-    candidate's status afterwards and the session result."""
-    if store.get_candidate(uarn) is None:
+    candidate's status afterwards and the session result. With revise_ref, the pack
+    is written as a new version of that case's pack."""
+    if store.get_candidate(uarn, run_id) is None:
         raise BuilderError(f"{uarn} is not in candidates")
-    store.set_candidate_status(uarn, "building_pack")
+    store.set_candidate_status(uarn, "building_pack", run_id)
     result = run_session(
         client, store, agent=AGENT,
         agent_id=resource_id("BUILDER_AGENT_ID", "./agent.md", LOCK_FILE),
         environment_id=resource_id("BUILDER_ENV_ID", "./environment.yaml", LOCK_FILE),
         title=f"builder {uarn}", model=MODEL, message=f"Candidate UARN: {uarn}",
-        handle=BuilderHandlers(store, data).handle,
+        handle=BuilderHandlers(store, data, run_id=run_id, revise_ref=revise_ref).handle,
         meter=budget.SpendMeter(model=MODEL), label=uarn, verbose=verbose,
     )
-    return store.get_candidate(uarn)["status"], result
+    return store.get_candidate(uarn, run_id)["status"], result
 
 
 def run_builder(uarn: str, *, client=None, store: Store | None = None,

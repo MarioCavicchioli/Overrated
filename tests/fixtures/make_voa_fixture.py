@@ -18,6 +18,10 @@ OTHER_SEGMENT = STREET + "#SCH2"
 BLOCK = "BLOCK STREET|EC1 9#SCH9"
 TWIN = "TWIN STREET|N4 1#SCH5"      # like Seven Sisters Road c_0101: MAD 0, two buildings
 PAIR = "PAIR STREET|N5 1#SCH6"      # two buildings priced apart, but a real spread
+ARCADE = "ARCADE STREET|E9 1#SCH7"  # an adult gaming centre under the shop code, and a
+                                    # subject with value outside its zones
+# Value outside the zones (stores, upper floors), included in the list value.
+EXTRA_VALUE = {900000401: 12000}
 
 # uarn: (zone_a_price, zone A / B / C areas, total_area, postcode, segment, desc_text)
 SHOPS = {
@@ -59,11 +63,20 @@ SHOPS = {
     900000305: (255, (30, 20, 0), 52, "N5 1FS", PAIR, "SHOP AND PREMISES"),
     900000306: (270, (30, 20, 0), 52, "N5 1ZZ", PAIR, "SHOP AND PREMISES"),
     900000307: (230, (30, 20, 0), 52, "N5 1ZZ", PAIR, "SHOP AND PREMISES"),
+    # ARCADE STREET: the nearest property, in the subject's own postcode, is an adult
+    # gaming centre under the same shop code 249: never a shop comparable.
+    900000401: (600, (30, 20, 0), 55, "E9 1AA", ARCADE, "SHOP AND PREMISES"),       # subject
+    900000402: (420, (30, 20, 0), 55, "E9 1AA", ARCADE, "ADULT GAMING CENTRE AND PREMISES"),
+    900000403: (400, (30, 21, 0), 56, "E9 1AB", ARCADE, "SHOP AND PREMISES"),
+    900000404: (410, (29, 20, 0), 54, "E9 1AB", ARCADE, "SHOP AND PREMISES (DABW)"),
+    900000405: (420, (30, 20, 0), 55, "E9 1AB", ARCADE, "SHOP"),
+    900000406: (450, (31, 20, 0), 56, "E9 1AB", ARCADE, "SHOP AND PREMISES"),
+    900000407: (380, (30, 19, 0), 54, "E9 1AB", ARCADE, "SHOP AND PREMISES"),
 }
 # Distance from each postcode centre to the subject's (same postcode = 0 m).
 DISTANCE = {"E8 1AA": 0, "E8 1AB": 60, "E8 1AC": 140, "E8 1AD": 90, "E8 9ZZ": None,
             "EC1 9AA": 0, "EC1 9AB": 150, "N4 1AA": 0, "N4 1FS": 42,
-            "N5 1AA": 0, "N5 1FS": 50, "N5 1ZZ": 400}
+            "N5 1AA": 0, "N5 1FS": 50, "N5 1ZZ": 400, "E9 1AA": 0, "E9 1AB": 40}
 LINES = ("Retail Zone A", "Retail Zone B", "Retail Zone C")
 FRACTION = (1, 0.5, 0.25)
 
@@ -76,7 +89,8 @@ def shop(uarn: int) -> dict:
         "postcode": postcode, "postcode_sector": postcode[:-2].strip(),
         "street_key": segment.split("#")[0], "street": segment.split("|")[0],
         "town": "LONDON", "ba_code": "0000", "scat_code": "249", "desc_text": desc,
-        "rv": int(round(za * itza, -2)), "total_area": total, "adopted_rv": int(round(za * itza, -2)),
+        "rv": int(round(za * itza + EXTRA_VALUE.get(uarn, 0), -2)), "total_area": total,
+        "adopted_rv": int(round(za * itza + EXTRA_VALUE.get(uarn, 0), -2)),
         "scheme_ref": segment.split("#")[1], "zone_a_price": za, "zone_a_area": areas[0],
         "itza": itza, "segment_key": segment,
     }
@@ -153,7 +167,7 @@ def main() -> None:
     responses = {f"/get_valuation/{u}": valuation(u) for u in SHOPS}
     responses.update({f"/comparables/{u}": comparables(u) for u in SHOPS})
     responses.update({f"/street_tone?segment_key={seg}": street_tone(seg)
-                      for seg in (SEGMENT, OTHER_SEGMENT, BLOCK, TWIN, PAIR)})
+                      for seg in (SEGMENT, OTHER_SEGMENT, BLOCK, TWIN, PAIR, ARCADE)})
     responses["/search_properties?q=TEST STREET"] = [
         {"uarn": u, "address": shop(u)["address"], "postcode": shop(u)["postcode"],
          "street_key": STREET, "use": SHOPS[u][5], "scat_code": "249", "rv": shop(u)["rv"],

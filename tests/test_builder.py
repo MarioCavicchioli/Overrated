@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agents.builder import rates
-from agents.builder.checks import check_pack, eligible_comparables, itza
+from agents.builder.checks import check_pack, eligible_comparables, itza, proposed_value
 from agents.builder.handlers import BuilderHandlers
 from data.mock.main import app
 from orchestrator.data_client import DataClient
@@ -43,7 +43,7 @@ def build_pack(data: DataClient, uarn: str, exclude: tuple[str, ...] = ()) -> di
                    "distance_m": c["distance_m"],
                    "reason": f"{c['spreads_from_median']} spreads above the street median"}
                   for c in eligible if c["uarn"] in exclude]
-    proposed = round(itza(s) * statistics.median(c["zone_a_price"] for c in comps))
+    proposed = proposed_value(s, statistics.median(c["zone_a_price"] for c in comps))
     pack = {
         "case_id": "c_0000", "version": "builder-v1", "uarn": uarn,
         "address": s["address"], "current_rv": s["rv"], "proposed_rv": proposed,
@@ -103,11 +103,11 @@ def test_wrong_figures_rejected(data):
     assert any("zone_a_price should be 400" in e for e in errors)
 
 
-def test_proposed_rv_outside_comparable_range_rejected(data):
+def test_proposed_rv_not_from_the_comparables_median_rejected(data):
     pack = good_pack(data)
     pack["proposed_rv"] = round(itza(data.get_valuation("1001008")) * 300)
     pack["annual_saving"] = rates.annual_saving(pack["current_rv"], pack["proposed_rv"], "shop")
-    assert any("outside the comparables' range" in e for e in check_pack(pack, data))
+    assert any("proposed_rv should be" in e for e in check_pack(pack, data))
 
 
 def test_eligible_set_for_outlier(data):
@@ -166,7 +166,7 @@ def test_submit_writes_pack_pdf_and_events(store, data):
     result = h.handle("submit_pack", args)
     assert result.startswith("ACCEPTED. Pack c_0001")
     row = store.get_pack("c_0001")
-    assert row["pack"]["case_id"] == "c_0001" and row["version"] == "builder-v1"
+    assert row["pack"]["case_id"] == "c_0001" and row["version"] == "builder-v2"
     assert row["annual_saving"] == row["pack"]["annual_saving"] == expected_saving
     assert Path(row["pdf_url"].removeprefix("file:///")).exists()
     assert store.get_candidate("1001008")["status"] == "pack_ready"
@@ -198,6 +198,20 @@ def test_scout_router_writes_against_its_runs_candidate(store, data):
     assert pack["candidate_id"] == store.get_candidate("1001008", hackney)["candidate_id"]
     assert store.get_candidate("1001008", hackney)["status"] == "pack_ready"
     assert store.get_candidate("1001008", lookups)["status"] == "building_pack"   # untouched
+
+
+def test_builder_revise_mode_writes_a_new_version(store, data):
+    seed(store, data, "1001008")
+    args = {k: v for k, v in good_pack(data).items() if k not in ("case_id", "version")}
+    assert BuilderHandlers(store, data).handle("submit_pack", args).startswith(
+        "ACCEPTED. Pack c_0001")
+    result = BuilderHandlers(store, data, revise_ref="c_0001").handle("submit_pack", args)
+    assert result.startswith("ACCEPTED. Pack c_0001")      # same ref, not c_0002
+    v2 = store.get_pack("c_0001")
+    assert v2["pack_version"] == 2 and v2["pdf_url"].endswith("c_0001_v2.pdf")
+    assert store.next_case_id() == "c_0002"
+    assert any("(version 2)" in e["message"] for e in store.list_events()
+               if e["kind"] == "pack_written")
 
 
 def test_rejected_pack_writes_nothing(store, data):

@@ -7,6 +7,7 @@ tests/fixtures/make_voa_fixture.py). No network, no real VOA data.
 from __future__ import annotations
 
 import json
+import statistics
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -132,6 +133,39 @@ def test_no_case_when_the_lower_price_is_only_another_buildings(voa):
     errors = check_pack(pack, voa)
     assert any("different postcode" in e and "900000302" in e for e in errors)
     assert not any("MAD 0" in e for e in errors)
+
+
+ARCADE_SUBJECT = "900000401"   # £12,000 of value outside its zones
+GAMING_CENTRE = "900000402"    # nearest, same postcode, same shop code 249
+
+
+def test_adult_gaming_centre_is_never_a_shop_comparable(voa):
+    nearest = voa.comparables(ARCADE_SUBJECT, max_distance=200, same_use=True)[0]
+    assert nearest["uarn"] == GAMING_CENTRE and nearest["use_class"] == "249"   # code alone passes
+    eligible = [c["uarn"] for c in eligible_comparables(ARCADE_SUBJECT, voa)]
+    assert GAMING_CENTRE not in eligible
+    assert {"900000404", "900000405"} <= set(eligible)      # "(DABW)" and plain "SHOP" still count
+    pack = build_pack(voa, ARCADE_SUBJECT)
+    gc = voa.get_valuation(GAMING_CENTRE)
+    pack["comparables"][0] = {"uarn": GAMING_CENTRE, "zone_a_price": gc["zone_a_price"],
+                              "distance_m": 0, "use": gc["use"]}
+    assert any("only same-use comparables" in e for e in check_pack(pack, voa))
+
+
+def test_proposed_value_keeps_the_value_outside_the_zones(voa):
+    """rv - ITZA x (old price - new price), not ITZA x new price."""
+    s = voa.get_valuation(ARCADE_SUBJECT)
+    good = build_pack(voa, ARCADE_SUBJECT)
+    assert check_pack(good, voa) == []
+    median = statistics.median(c["zone_a_price"] for c in good["comparables"])
+    assert good["proposed_rv"] == round(s["rv"] - s["itza"] * (s["zone_a_price"] - median))
+    old_way = round(s["itza"] * median)
+    assert good["proposed_rv"] - old_way == pytest.approx(12000, abs=100)   # the extras kept
+    bad = {**good, "proposed_rv": old_way,
+           "annual_saving": rates.annual_saving(s["rv"], old_way, rates.use_of(s))}
+    errors = check_pack(bad, voa)
+    assert any("proposed_rv should be" in e and "drops the value outside the zones" in e
+               for e in errors)
 
 
 def test_unknown_uarn_and_bad_key(voa):

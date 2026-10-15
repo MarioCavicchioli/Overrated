@@ -121,7 +121,7 @@ def test_accepted_verdict_writes_row_and_event(handlers, store):
                                              "reasons": [reason("1001011", "sound")]})
     assert out.startswith("ACCEPTED.")
     [row] = store.list_verdicts("c_0002")
-    assert row["verdict"] == "survive" and row["version"] == "advocate-v2"
+    assert row["verdict"] == "survive" and row["version"] == "advocate-v3"
     assert row["reasons"] == [{"reason": "Record 1001011 was checked against the pack.",
                                "voa_record": "1001011", "kind": "sound"}]
     assert store.list_events()[-1]["kind"] == "verdict"

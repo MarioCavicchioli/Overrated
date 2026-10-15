@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import statistics
 from pathlib import Path
 from typing import Any
 
@@ -45,9 +47,25 @@ def floor_area(valuation: dict) -> float:
     return float(valuation.get("floor_area_m2") or sum(z["area_m2"] for z in valuation["zones"]))
 
 
+def core_use(description: str) -> str:
+    """The use itself, without the VOA's suffixes: "SHOP AND PREMISES (DABW)" -> "SHOP"."""
+    text = re.sub(r"\([^)]*\)", " ", (description or "").upper())
+    text = re.sub(r"\bAND PREMISES\b", " ", text)
+    return " ".join(text.split())
+
+
 def same_use(a: dict, b: dict) -> bool:
-    """Same use = same use_class (the VOA scheme code for real data)."""
-    return (a.get("use_class") or a["use"]) == (b.get("use_class") or b["use"])
+    """Same use = same use_class (the VOA scheme code for real data) AND the same core
+    description. The scheme code alone isn't enough: an adult gaming centre can share
+    the shop code 249, but it is never a shop comparable."""
+    same_class = (a.get("use_class") or a["use"]) == (b.get("use_class") or b["use"])
+    return same_class and core_use(a["use"]) == core_use(b["use"])
+
+
+def proposed_value(valuation: dict, new_zone_a_price: float) -> int:
+    """Current value minus the zoned area re-priced: rv - ITZA x (old price - new price).
+    Keeps the value of everything outside the zones (stores, upper floors, extras)."""
+    return round(valuation["rv"] - itza(valuation) * (valuation["zone_a_price"] - new_zone_a_price))
 
 
 def spreads_from_median(zone_a_price: float, tone: dict) -> float:
@@ -74,6 +92,8 @@ def eligible_comparables(uarn: str, data: DataClient) -> list[dict]:
     out = []
     for c in data.comparables(uarn, max_distance=COMP_MAX_DISTANCE_M, same_use=True, limit=200):
         record = data.get_valuation(c["uarn"])
+        if not same_use(record, subject):
+            continue                     # e.g. an adult gaming centre under the shop code
         ratio = floor_area(record) / floor_area(subject)
         if not SIZE_RATIO_MIN <= ratio <= SIZE_RATIO_MAX:
             continue
@@ -227,14 +247,16 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
     if pack["proposed_rv"] >= pack["current_rv"]:
         errors.append("proposed_rv must be below current_rv")
 
-    # The proposed value must come from a Zone A price inside the comparables' range.
+    # The proposed value re-prices the zoned area only; everything else in the value
+    # (stores, upper floors, extras) stays as it is.
     if comp_prices:
-        implied = pack["proposed_rv"] / itza(subject)
-        lo, hi = min(comp_prices), max(comp_prices)
-        if not lo - 1 <= implied <= hi + 1:
-            errors.append(f"proposed_rv implies a Zone A price of £{implied:.2f}/m2, outside "
-                          f"the comparables' range £{lo}-£{hi}; proposed_rv = ITZA "
-                          f"({itza(subject):.2f} m2) x the Zone A price you argue for")
+        expected_rv = proposed_value(subject, statistics.median(comp_prices))
+        if abs(pack["proposed_rv"] - expected_rv) > 1:
+            errors.append(
+                f"proposed_rv should be {expected_rv}: current value £{subject['rv']:,} minus "
+                f"ITZA ({itza(subject):.2f} m2) x (current Zone A £{subject['zone_a_price']} minus "
+                f"the comparables' median £{statistics.median(comp_prices)}). Don't multiply "
+                "ITZA by the new price: that drops the value outside the zones")
 
     expected = rates.annual_saving(subject["rv"], pack["proposed_rv"], rates.use_of(subject))
     if pack["proposed_rv"] < subject["rv"] and pack["annual_saving"] != expected:

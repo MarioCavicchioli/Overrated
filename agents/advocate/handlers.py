@@ -16,7 +16,7 @@ from orchestrator.data_client import DataClient, NotFound
 from orchestrator.store import Store
 
 AGENT = "advocate"
-VERSION = "advocate-v2"
+VERSION = "advocate-v3"   # v3: team spread, corrected proposed value, core-use rule
 MAX_SUBMIT_ATTEMPTS = 3
 VERDICTS = ("survive", "kill")
 KINDS = ("cherry_picking", "wrong_exclusion", "different_use", "different_size",

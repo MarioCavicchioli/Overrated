@@ -143,8 +143,9 @@ class Pipeline:
                 continue
             pack = self.store.get_pack(case_id)
             uarn = pack["uarn"]
+            case = self.store.get_case(case_id)
             if verdict["verdict"] == "survive":
-                if self.store.get_case(case_id) is None:
+                if case is None:
                     self.store.set_pack_status(case_id, "survive")
                     create_case(self.store, case_id, uarn)
                     self.store.set_pack_status(case_id, "waiting_owner")
@@ -152,15 +153,47 @@ class Pipeline:
                     self.store.add_event(AGENT, "case_opened",
                                          "Survived the VOA advocate; waiting for the owner",
                                          case_id=case_id)
+                elif pack["status"] in ("built", "reviewing"):
+                    self._recheck_survived(case_id, pack, case)
             elif verdict["verdict"] == "kill":
                 candidate = self.store.get_candidate(uarn)
-                if candidate and candidate["status"] != "killed" \
-                        and self.store.get_case(case_id) is None:
+                if case is not None:
+                    if pack["status"] in ("built", "reviewing"):
+                        self._recheck_killed(case_id, pack, case, verdict)
+                elif candidate and candidate["status"] != "killed":
                     self.store.set_candidate_status(uarn, "killed")
                     self.store.set_pack_status(case_id, "killed")
                     self.store.add_event(AGENT, "killed",
                                          "Killed by the VOA advocate: " + _reasons(verdict),
                                          case_id=case_id)
+
+    # -- a new pack version for a case that is already open -------------------
+    def _recheck_survived(self, ref: str, pack: dict, case: dict) -> None:
+        version, saving = pack.get("pack_version"), float(pack["annual_saving"])
+        self.store.set_pack_status(ref, "approved" if case["owner_approved"] else "waiting_owner")
+        self.store.set_candidate_status(pack["uarn"],
+                                        "approved" if case["owner_approved"] else "waiting_owner")
+        self.store.update_case(ref, {"history": case["history"] + [{
+            "ts": _now(), "type": "rechecked",
+            "text": f"Pack version {version} survived the VOA advocate again. Estimated "
+                    f"saving now £{saving:,.0f} a year."}]})
+        self.store.add_event(AGENT, "case_rechecked",
+                             f"Pack version {version} survived again; saving £{saving:,.0f}/yr",
+                             case_id=ref)
+
+    def _recheck_killed(self, ref: str, pack: dict, case: dict, verdict: dict) -> None:
+        version = pack.get("pack_version")
+        self.store.set_pack_status(ref, "killed")
+        self.store.set_candidate_status(pack["uarn"], "killed")
+        # Before the owner approves, the case simply closes. After, a person decides.
+        stage = "needs_human" if case["owner_approved"] else "closed"
+        self.store.update_case(ref, {"stage": stage, "history": case["history"] + [{
+            "ts": _now(), "type": "rechecked",
+            "text": f"Pack version {version} was killed by the VOA advocate: "
+                    + _reasons(verdict)[:300]}]})
+        self.store.add_event(AGENT, "case_closed" if stage == "closed" else "case_needs_human",
+                             f"Pack version {version} killed: " + _reasons(verdict),
+                             case_id=ref)
 
     # -- the loop ------------------------------------------------------------
     def tick(self) -> list[str]:
@@ -200,6 +233,11 @@ class Pipeline:
         finally:
             with self.lock:
                 self.in_flight.discard(case_id)
+
+
+def _now() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _reasons(verdict: dict) -> str:

@@ -89,6 +89,7 @@ class Store(Protocol):
     def has_pack(self, uarn: str) -> bool: ...
     def next_case_id(self) -> str: ...
     def insert_pack(self, row: dict[str, Any]) -> None: ...
+    def insert_pack_version(self, row: dict[str, Any]) -> int: ...
     def get_pack(self, case_id: str) -> dict[str, Any] | None: ...
     def set_pack_status(self, case_id: str, status: str) -> None: ...
     def list_case_ids(self) -> list[str]: ...
@@ -136,28 +137,25 @@ class BaseStore:
         return self._one("packs", [("case_ref", "eq", ref)], [("created_at", True)])
 
     def _keys(self, ref: str | None) -> dict[str, str | None]:
-        """case uuid, pack_id and candidate_id for a readable ref (None if unknown)."""
-        if ref is None:
+        """case uuid, pack_id and candidate_id of the pack that holds a readable ref now.
+        Not cached: a new pack version takes over the ref, and the watcher runs in
+        another process."""
+        row = self._pack_row(ref) if ref else None
+        if row is None:
             return {"case_id": None, "pack_id": None, "candidate_id": None}
-        if ref not in self._key_cache:
-            row = self._pack_row(ref)
-            if row is None:
-                return {"case_id": None, "pack_id": None, "candidate_id": None}
-            self._key_cache[ref] = {"case_id": row["case_id"], "pack_id": row["pack_id"],
-                                    "candidate_id": row["candidate_id"]}
-        return self._key_cache[ref]
+        return {"case_id": row["case_id"], "pack_id": row["pack_id"],
+                "candidate_id": row["candidate_id"]}
 
     def _refs_for(self, case_uuids: set[str]) -> dict[str, str]:
-        missing = {u for u in case_uuids if u and u not in self._ref_cache}
-        if missing:
-            for row in self._select("packs", [("case_id", "in", sorted(missing))]):
-                if row.get("case_ref"):
-                    self._ref_cache[row["case_id"]] = row["case_ref"]
-        return {u: self._ref_cache[u] for u in case_uuids if u in self._ref_cache}
+        """Readable refs for case uuids; a superseded pack version has none."""
+        wanted = sorted(u for u in case_uuids if u)
+        if not wanted:
+            return {}
+        return {row["case_id"]: row["case_ref"]
+                for row in self._select("packs", [("case_id", "in", wanted)])
+                if row.get("case_ref")}
 
     def __init__(self) -> None:
-        self._key_cache: dict[str, dict[str, str]] = {}
-        self._ref_cache: dict[str, str] = {}
         self._run_id: str | None = None
 
     # -- candidates --------------------------------------------------------------
@@ -238,18 +236,16 @@ class BaseStore:
                 n = max(n, int(ref[2:]))
         return f"c_{n + 1:04d}"
 
-    def insert_pack(self, row: dict[str, Any]) -> None:
-        ref, pack = row["case_id"], row["pack"]
-        cand = self.get_candidate(row["uarn"], row.get("run_id"))
-        if cand is None:
-            raise ValueError(f"no candidate for {row['uarn']}")
+    def _pack_record(self, row: dict[str, Any], cand: dict[str, Any], case_ref: str | None,
+                     pack_version: int = 1) -> dict[str, Any]:
+        pack = row["pack"]
         refs = [{"type": "voa_record", "uarn": row["uarn"], "role": "subject"}] + [
             {"type": "voa_record", "uarn": c["uarn"], "role": "comparable"}
             for c in row["comparables"]]
-        self._insert("packs", {
-            "pack_id": new_id(), "case_id": new_id(), "case_ref": ref,
-            "candidate_id": cand["candidate_id"], "uarn": row["uarn"],
-            "address": pack.get("address") or cand["address"],
+        return {
+            "pack_id": new_id(), "case_id": new_id(), "case_ref": case_ref,
+            "candidate_id": cand["candidate_id"], "pack_version": pack_version,
+            "uarn": row["uarn"], "address": pack.get("address") or cand["address"],
             "current_rv": pack.get("current_rv", cand.get("rv") or 0),
             "proposed_rv": row["proposed_rv"], "comparables": row["comparables"],
             "calc": pack.get("calc", {}), "annual_saving": row["annual_saving"],
@@ -258,7 +254,39 @@ class BaseStore:
             "source_snapshot": row.get("source_snapshot") or cand.get("source_snapshot") or _snapshot(),
             "pdf_url": row.get("pdf_url"), "status": "built",
             "builder_version": row["version"], "pack": pack, "created_at": now_iso(),
-        })
+        }
+
+    def insert_pack(self, row: dict[str, Any]) -> None:
+        cand = self.get_candidate(row["uarn"], row.get("run_id"))
+        if cand is None:
+            raise ValueError(f"no candidate for {row['uarn']}")
+        self._insert("packs", self._pack_record(row, cand, row["case_id"]))
+
+    def insert_pack_version(self, row: dict[str, Any]) -> int:
+        """A new version of the pack that holds row["case_id"] (a readable ref). The ref,
+        and any case, move to the new version; the old row keeps its contents, loses the
+        ref and becomes 'superseded'. Returns the new pack_version.
+
+        Order matters, because the watcher reads the same tables meanwhile: the new row
+        goes in without the ref, the old row lets go of it, the case moves, and only
+        then does the new row take the ref. At no point do two packs hold one ref, and
+        the watcher never sees the ref on a pack without its case."""
+        ref = row["case_id"]
+        old = self._pack_row(ref)
+        if old is None:
+            raise ValueError(f"no pack {ref} to replace")
+        cand = self._one("candidates", [("candidate_id", "eq", old["candidate_id"])])
+        version = int(old.get("pack_version") or 1) + 1
+        new = self._pack_record(row, cand, None, version)
+        self._insert("packs", new)
+        self._update("packs", {"case_ref": None, "status": "superseded"},
+                     [("pack_id", "eq", old["pack_id"])])
+        if self._one("cases", [("case_id", "eq", old["case_id"])]) is not None:
+            self._update("cases", {"case_id": new["case_id"], "pack_id": new["pack_id"],
+                                   "updated_at": now_iso()},
+                         [("case_id", "eq", old["case_id"])])
+        self._update("packs", {"case_ref": ref}, [("pack_id", "eq", new["pack_id"])])
+        return version
 
     def get_pack(self, case_id: str) -> dict[str, Any] | None:
         row = self._pack_row(case_id)

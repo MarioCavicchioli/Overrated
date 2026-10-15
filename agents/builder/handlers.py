@@ -23,7 +23,7 @@ from orchestrator.data_client import DataClient, NotFound
 from orchestrator.store import Store
 
 AGENT = "builder"
-VERSION = "builder-v1"
+VERSION = "builder-v2"   # v2: proposed value keeps the value outside the zones; core-use check
 MAX_SUBMIT_ATTEMPTS = 3
 
 DATA_TOOLS = ("search_properties", "get_valuation", "comparables", "street_tone")
@@ -31,12 +31,15 @@ TOOLS = DATA_TOOLS + ("eligible_comparables", "submit_pack", "no_case")
 
 
 class BuilderHandlers:
-    def __init__(self, store: Store, data: DataClient, run_id: str | None = None):
+    def __init__(self, store: Store, data: DataClient, run_id: str | None = None,
+                 revise_ref: str | None = None):
         """run_id: the Scout run whose candidates this builder works on, when it runs in
-        the Scout's workflow runs (a UARN can be a candidate in several runs)."""
+        the Scout's workflow runs (a UARN can be a candidate in several runs).
+        revise_ref: rebuild that case's pack as a new version under the same ref."""
         self.store = store
         self.data = data
         self.run_id = run_id
+        self.revise_ref = revise_ref
         self.attempts: dict[str, int] = defaultdict(int)   # uarn -> submit_pack calls
 
     def handles(self, name: str) -> bool:
@@ -95,19 +98,33 @@ class BuilderHandlers:
                     f"again ({left} attempt(s) left), or call no_case if it can't be fixed:\n- "
                     + "\n- ".join(errors))
 
-        pack["case_id"] = self.store.next_case_id()
-        pdf_url = self.store.save_pdf(pack["case_id"], render_pack_pdf(pack))
-        self.store.insert_pack({
+        if self.revise_ref:
+            old = self.store.get_pack(self.revise_ref)
+            if old is None or old["uarn"] != uarn:
+                return f"ERROR: {self.revise_ref} is not a pack for {uarn}"
+            pack["case_id"] = self.revise_ref
+            version = int(old.get("pack_version") or 1) + 1
+            pdf_name = f"{self.revise_ref}_v{version}"
+        else:
+            pack["case_id"] = self.store.next_case_id()
+            version, pdf_name = 1, pack["case_id"]
+        pdf_url = self.store.save_pdf(pdf_name, render_pack_pdf(pack))
+        row = {
             "case_id": pack["case_id"], "uarn": uarn, "pack": pack,
             "comparables": pack["comparables"], "proposed_rv": pack["proposed_rv"],
             "annual_saving": pack["annual_saving"], "argument": pack["argument"],
             "pdf_url": pdf_url, "version": VERSION, "run_id": self.run_id,
-        })
+        }
+        if self.revise_ref:
+            self.store.insert_pack_version(row)
+        else:
+            self.store.insert_pack(row)
         self.store.set_candidate_status(uarn, "pack_ready", self.run_id)
         self.store.add_event(
             AGENT, "pack_written",
             f"{pack['address']}: £{pack['current_rv']:,} -> £{pack['proposed_rv']:,}, "
-            f"saving £{pack['annual_saving']:,}/yr, {len(pack['comparables'])} comparables",
+            f"saving £{pack['annual_saving']:,}/yr, {len(pack['comparables'])} comparables"
+            + (f" (version {version})" if version > 1 else ""),
             case_id=pack["case_id"], run_id=self.run_id)
         return (f"ACCEPTED. Pack {pack['case_id']} written, annual saving "
                 f"£{pack['annual_saving']:,}. Your work on this candidate is done.")
