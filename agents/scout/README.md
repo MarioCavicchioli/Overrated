@@ -37,6 +37,11 @@ Budget: SESSION_TOKEN_BUDGET priced at Opus 5.5's output rate ($20 per million),
 
 ## Scoring (defaults; the live playbook overrides)
 
-- keep: z_score >= 2 on a street with 5+ shops and est_saving >= £1,000, or just over £51k / £500k
-- `segment_cluster` flag: 3+ shops on the street share the same high Zone A price, so probably a separate VOA segment; kept but ranked lower
-- Hackney dry run of these rules on the data service: 2,365 shops on 100 streets, 101 candidates (31 clean, 70 segment_cluster) on 21 streets
+- tone is per segment (street + postcode sector + VOA scheme), from the data service
+- keep: z_score >= 2 in a segment with 5+ shops and est_saving >= £1,000; or just over £51k / £500k with z_score >= 1
+- `segment_cluster` flag: 3+ shops in the segment share the same high Zone A price (usually neighbouring addresses), so probably priced deliberately; kept but score halved
+- writes Person 3's schema: run.py creates or resumes the `scout_runs` row and passes run_id; candidates are unique per (run_id, uarn, rating_list); events carry run_id and an idempotency key
+
+History on Hackney (2,365 shops):
+- scout-v1, tone per street: 101 candidates, 82 above tone (~£750k), of which 74 were whole VOA schemes priced higher
+- data service by segment: 2,336 shops in 95 segments, 34 above tone (~£124k), 28 of them in same-price runs inside one scheme
