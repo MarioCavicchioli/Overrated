@@ -31,6 +31,16 @@ def anthropic_client():
     return anthropic.Anthropic(default_headers=headers)
 
 
+def supabase_url() -> str | None:
+    """The project URL supabase-py expects. Accepts the REST URL too
+    (https://<ref>.supabase.co/rest/v1/), which is what the dashboard often shows."""
+    url = os.getenv("SUPABASE_URL")
+    if not url:
+        return None
+    url = url.rstrip("/")
+    return url.removesuffix("/rest/v1")
+
+
 def trace_url(session_id: str) -> str:
     """Console link to a session, in the workspace the client sends requests to."""
     workspace = os.getenv("ANTHROPIC_WORKSPACE_ID") or "default"

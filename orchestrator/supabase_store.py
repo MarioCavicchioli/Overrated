@@ -16,6 +16,7 @@ from typing import Any
 from postgrest.types import CountMethod
 from supabase import Client, create_client
 
+from orchestrator.config import supabase_url
 from orchestrator.store import CANDIDATE_STATUSES, CASE_STAGES
 
 PDF_BUCKET = "packs"
@@ -24,7 +25,7 @@ PDF_BUCKET = "packs"
 class SupabaseStore:
     def __init__(self, client: Client | None = None):
         if client is None:
-            url, key = os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+            url, key = supabase_url(), os.getenv("SUPABASE_SERVICE_ROLE_KEY")
             if not url or not key:
                 raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set")
             client = create_client(url, key)
