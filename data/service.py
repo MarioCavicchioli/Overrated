@@ -258,16 +258,21 @@ def historic_values(uarn: int):
 
 
 @app.get("/scan", dependencies=[Depends(auth)])
-def scan(area: str = Query(..., description="postcode district or sector, e.g. SW19 or SW19 5"),
-         year: str = "2026", scat_code: str = "249", min_street_n: int = 5, limit: int = Query(200, le=2000)):
-    """Scout helper: score every shop in an area against its street tone; flagged ones first."""
+def scan(area: str = Query("", description="postcode district or sector, e.g. SW19 or SW19 5"),
+         ba_code: str = Query("", description="billing authority code, e.g. 5360 for Hackney"),
+         year: str = "2026", scat_code: str = "249", min_street_n: int = 5,
+         flagged_only: bool = False, limit: int = Query(200, le=5000)):
+    """Scout helper: score every shop in an area or borough against its street tone; flagged ones first."""
     if year not in ("2026", "2023"):
         raise HTTPException(400, "year is 2026 or 2023")
     area = area.upper().strip()
+    if not area and not ba_code:
+        raise HTTPException(400, "give area or ba_code")
     rows = q(f"""
         with s as (
           select * from shops_{year} where scat_code = $2
-            and (postcode_sector = $1 or postcode_sector like $1 || ' %')
+            and ($1 = '' or postcode_sector = $1 or postcode_sector like $1 || ' %')
+            and ($4 = '' or ba_code = $4)
         ),
         t as (
           select street_key, count(*) n, median(zone_a_price) median from shops_{year}
@@ -282,7 +287,7 @@ def scan(area: str = Query(..., description="postcode district or sector, e.g. S
                greatest(1.4826 * m.mad, 0.05 * t.median) street_spread
         from s join t using (street_key) join m using (street_key)
         where t.n >= $3
-    """, (area, scat_code, min_street_n))
+    """, (area, scat_code, min_street_n, ba_code))
     out = []
     for r in rows:
         t = {"n": r["street_n"], "median": r["street_median"], "spread": r["street_spread"]}
@@ -293,5 +298,7 @@ def scan(area: str = Query(..., description="postcode district or sector, e.g. S
         r["proposal"] = p
         out.append(r)
     out.sort(key=lambda r: (-len(r["flags"]), -r["est_saving"], -r["z_score"]))
-    return {"area": area, "year": year, "scored": len(out),
-            "flagged": sum(1 for r in out if r["flags"]), "shops": out[:limit]}
+    flagged = [r for r in out if r["flags"]]
+    return {"area": area, "ba_code": ba_code, "year": year, "scored": len(out),
+            "streets": len({r["street_key"] for r in out}), "flagged": len(flagged),
+            "shops": (flagged if flagged_only else out)[:limit]}

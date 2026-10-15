@@ -1,0 +1,135 @@
+"""Start a Scout session on a target borough and follow it until it finishes.
+
+Run: .venv/bin/python agents/scout/run.py [--ba-code 5360 --name Hackney]
+Needs `ant apply` done (IDs in claude-lock.json, or SCOUT_AGENT_ID / SCOUT_ENV_ID /
+VAULT_ID in .env) and the credentials added with add_credentials.py.
+"""
+import argparse
+import json
+import os
+
+import anthropic
+import httpx
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+LOCK_KEYS = {
+    "SCOUT_AGENT_ID": "./agents/scout/agent.md",
+    "SCOUT_ENV_ID": "./agents/scout/environment.yaml",
+    "VAULT_ID": "./agents/scout/vault.yaml",
+}
+
+
+def load_env():
+    for line in open(os.path.join(ROOT, ".env")):
+        k, _, v = line.strip().partition("=")
+        if k and not k.startswith("#") and v:
+            os.environ.setdefault(k, v)
+
+
+def resource_ids():
+    lock = {}
+    path = os.path.join(ROOT, "claude-lock.json")
+    if os.path.exists(path):
+        lock = json.load(open(path)).get("resources", {})
+    ids = {}
+    for var, key in LOCK_KEYS.items():
+        ids[var] = os.environ.get(var) or lock.get(key, {}).get("id")
+        if not ids[var]:
+            raise SystemExit(f"{var} not set and {key} not in claude-lock.json; run ant apply first")
+    return ids
+
+
+def budget_cents():
+    """SESSION_TOKEN_BUDGET priced at Opus 5.5's output rate ($20/M), the worst case."""
+    if os.environ.get("SESSION_BUDGET_CENTS"):
+        return int(os.environ["SESSION_BUDGET_CENTS"])
+    tokens = int(os.environ.get("SESSION_TOKEN_BUDGET", "200000"))
+    return max(tokens * 20 * 100 // 1_000_000, 50)
+
+
+def log_event(kind, message, tokens=0):
+    """Orchestrator-side events row (spend), when Supabase is configured."""
+    url, key = os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not (url and key):
+        return
+    httpx.post(f"{url}/rest/v1/events", timeout=10, json={
+        "agent": "scout", "kind": kind, "message": message, "tokens": tokens,
+    }, headers={"apikey": key, "Authorization": f"Bearer {key}"})
+
+
+def kickoff(ba_code, name):
+    lines = [
+        f"Target: the London Borough of {name}, billing authority code {ba_code}. Checkpoint target id: ba{ba_code}.",
+        f"Data service base URL: {os.environ['DATA_SERVICE_URL']}",
+    ]
+    if os.environ.get("SUPABASE_URL"):
+        lines.append(f"Supabase base URL: {os.environ['SUPABASE_URL']}")
+    else:
+        lines.append("Supabase is not set up yet: write rows to /mnt/session/outputs/ instead.")
+    lines.append("Run the sweep as your instructions describe, then report.")
+    return "\n".join(lines)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--ba-code", default="5360")
+    ap.add_argument("--name", default="Hackney")
+    args = ap.parse_args()
+
+    load_env()
+    ids = resource_ids()
+    client = anthropic.Anthropic()
+    cents = budget_cents()
+
+    session = client.beta.sessions.create(
+        agent=ids["SCOUT_AGENT_ID"],
+        environment_id=ids["SCOUT_ENV_ID"],
+        vault_ids=[ids["VAULT_ID"]],
+        title=f"Scout: {args.name}",
+        budget={"type": "limit", "max_list_cost": {"amount": str(cents), "currency": "USD"}},
+        metadata={"agent": "scout", "target": f"ba{args.ba_code}"},
+    )
+    print(f"session {session.id} (budget ${cents / 100:.2f})")
+    print(f"watch: https://platform.claude.com/workspaces/default/sessions/{session.id}")
+    log_event("session_started", f"Scout session {session.id} on {args.name}, budget ${cents / 100:.2f}")
+
+    tokens = 0
+    with client.beta.sessions.events.stream(session_id=session.id) as stream:
+        client.beta.sessions.events.send(session_id=session.id, events=[
+            {"type": "user.message", "content": [{"type": "text", "text": kickoff(args.ba_code, args.name)}]},
+        ])
+        for event in stream:
+            if event.type == "agent.message":
+                for block in event.content:
+                    if block.type == "text":
+                        print(block.text, flush=True)
+            elif event.type == "agent.tool_use":
+                print(f"  [{event.name}]", flush=True)
+            elif event.type in ("session.thread_created", "session.thread_status_terminated"):
+                print(f"  {event.type}: {event.agent_name}", flush=True)
+            elif event.type == "span.model_request_end" and event.model_usage:
+                u = event.model_usage
+                tokens += (u.input_tokens or 0) + (u.output_tokens or 0) + (u.cache_creation_input_tokens or 0)
+            elif event.type == "session.error":
+                print(f"  session error: {event}", flush=True)
+
+            if (event.type in ("agent.tool_use", "agent.mcp_tool_use")
+                    and getattr(event, "evaluated_permission", None) == "ask"):
+                # Unattended run: nothing the Scout needs should be ambiguous, so deny and say why.
+                client.beta.sessions.events.send(session_id=session.id, events=[{
+                    "type": "user.tool_confirmation", "tool_use_id": event.id, "result": "deny",
+                    "deny_message": "Unattended run: this call needs a human. Find another way or report it.",
+                }])
+            elif event.type == "session.status_terminated":
+                break
+            elif event.type == "session.status_idle" and event.stop_reason.type != "requires_action":
+                print(f"idle: {event.stop_reason.type}")
+                break
+
+    cost = client.beta.sessions.retrieve(session.id).usage
+    print(f"tokens {tokens:,}; usage {cost}")
+    log_event("session_finished", f"Scout session {session.id} finished", tokens)
+
+
+if __name__ == "__main__":
+    main()

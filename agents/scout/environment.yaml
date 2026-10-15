@@ -1,0 +1,11 @@
+# Scout sandbox. Limited egress: only the data service tunnel and the Supabase project.
+# Replace YOUR_PROJECT with the Supabase project ref (from SUPABASE_URL) before `ant apply`.
+name: overrated-scout
+config:
+  type: cloud
+  networking:
+    type: limited
+    allow_package_managers: false
+    allowed_hosts:
+      - undrilled-important-sputter.ngrok-free.dev
+      - YOUR_PROJECT.supabase.co

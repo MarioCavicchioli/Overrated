@@ -22,7 +22,7 @@ Every request except /health needs header `X-API-Key: $DATA_SERVICE_KEY` (VOA da
 - `/comparables/{uarn}?n=6`: same street segment and SCAT first, then same postcode sector; each has uarn, zone_a_price, distance_m, use
 - `/street_tone?uarn=` or `?street_key=HIGH STREET|SW19 5&scat_code=249&year=2026`
 - `/historic_values/{uarn}`: 2023 entry, historic entries, 2023 Zone A and tone (eval only)
-- `/scan?area=SW19&year=2026`: every shop in a postcode district/sector scored against its street, flagged first
+- `/scan?ba_code=5360&flagged_only=true` or `/scan?area=SW19`: every shop in a borough or postcode district/sector scored against its street, flagged first (Hackney is 5360)
 
 ## Definitions
 

@@ -1,0 +1,3 @@
+# Credential container for Overrated agents. Credentials are added by add_credentials.py, never stored here.
+type: vault
+display_name: overrated
