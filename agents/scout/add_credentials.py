@@ -30,7 +30,8 @@ def vault_id():
 
 def main():
     load_env()
-    client = anthropic.Anthropic()
+    ws = os.environ.get("ANTHROPIC_WORKSPACE_ID")  # needed when the API key isn't scoped to one workspace
+    client = anthropic.Anthropic(default_headers={"anthropic-workspace-id": ws} if ws else None)
     vid = vault_id()
     secrets = [
         ("DATA_SERVICE_KEY", "DATA_SERVICE_URL", "Overrated data service key"),

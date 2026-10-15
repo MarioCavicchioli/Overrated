@@ -78,7 +78,8 @@ def main():
 
     load_env()
     ids = resource_ids()
-    client = anthropic.Anthropic()
+    ws = os.environ.get("ANTHROPIC_WORKSPACE_ID")  # needed when the API key isn't scoped to one workspace
+    client = anthropic.Anthropic(default_headers={"anthropic-workspace-id": ws} if ws else None)
     cents = budget_cents()
 
     session = client.beta.sessions.create(
