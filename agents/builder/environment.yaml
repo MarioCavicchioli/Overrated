@@ -1,0 +1,11 @@
+# Sandbox for standalone builder test sessions. In production the builder runs
+# inside the Scout's session and uses the Scout's environment instead.
+# The builder has no sandbox tools (all its tools are custom tools answered by the
+# orchestrator), so it needs no network access at all.
+name: overrated-builder-test
+config:
+  type: cloud
+  networking:
+    type: limited
+    allow_package_managers: false
+    allow_mcp_servers: false

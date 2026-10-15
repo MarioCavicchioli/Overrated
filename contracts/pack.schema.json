@@ -31,6 +31,22 @@
         }
       }
     },
+    "exclusions": {
+      "type": "array",
+      "maxItems": 6,
+      "description": "Eligible comparables the builder left out, each with its reason. Code allows an exclusion only when its Zone A price is more than 2 spreads from the street median.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["uarn", "zone_a_price", "distance_m", "reason"],
+        "properties": {
+          "uarn": { "type": "string" },
+          "zone_a_price": { "type": "number", "minimum": 0 },
+          "distance_m": { "type": "number", "minimum": 0 },
+          "reason": { "type": "string", "minLength": 10 }
+        }
+      }
+    },
     "calc": {
       "type": "object",
       "additionalProperties": false,
@@ -41,7 +57,7 @@
         "street_spread": { "type": "number", "description": "Spread (e.g. MAD) of Zone A prices on the segment" }
       }
     },
-    "annual_saving": { "type": "integer", "minimum": 0, "description": "(current_rv - proposed_rv) x multiplier, GBP per year" },
+    "annual_saving": { "type": "integer", "minimum": 0, "description": "Bill at current_rv minus bill at proposed_rv, each at its own 2026 multiplier band, GBP per year. Computed by code, never by the model." },
     "argument": { "type": "string", "minLength": 50, "description": "Plain-English case" },
     "version": { "type": "string", "description": "Builder version that produced the pack, e.g. builder-v1" }
   },

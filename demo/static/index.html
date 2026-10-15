@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overrated</title>
+<meta name="description" content="Check whether your business rates valuation is higher than similar shops on your street, and challenge it.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="/static/app.css?v=8">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+<script src="/static/app.js?v=8" defer></script>
+</head>
+<body>
+<a class="skip" href="#main" id="skip-link">Skip to content</a>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="wordmark" href="#/">Overrated</a>
+    <nav class="nav" aria-label="Main">
+      <a href="#/" data-nav="search">Search</a>
+      <a href="#/area" data-nav="area">Area sweep (Hackney)</a>
+    </nav>
+    <div class="topbar-search" id="topbar-search" hidden></div>
+  </div>
+</header>
+<div class="mock-banner" id="mock-banner" hidden>Development fixtures (?mock=1): every number on this page is synthetic.</div>
+<main id="main" class="page" tabindex="-1">
+  <p class="loading-line">Loading...</p>
+  <noscript><p>This app needs JavaScript.</p></noscript>
+</main>
+<footer class="footer">
+  <p>Overrated prototype. Data: VOA 2026 rating list and summary valuations (compiled epoch 0004), used for rating purposes only.</p>
+  <p>Filings are mocked: nothing is submitted to the VOA. Savings are estimates before reliefs.</p>
+</footer>
+</body>
+</html>

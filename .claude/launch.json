@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "overrated-app",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["-u", "ANTHROPIC_API_KEY", "-u", "ANTHROPIC_WORKSPACE_ID", ".venv/bin/uvicorn", "demo.server:app", "--host", "127.0.0.1", "--port", "8100"],
+      "port": 8100
+    }
+  ]
+}
