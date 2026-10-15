@@ -1,0 +1,52 @@
+{
+  "_source": "packs row c_0003 from the p2-cases store, built 2026-10-15T10:40:08.875Z by builder-v1",
+  "pack": {
+    "address": "145 Mare Street, Hackney, London E8 3RH",
+    "argument": "Your shop at 145 Mare Street is currently valued at a Zone A price of £450 per m2, giving a rateable value of £27,338. Its area in terms of Zone A is 60.75 m2 (42 m2 in Zone A, 30 m2 in Zone B at half rate and 15 m2 in Zone C at a quarter rate). Across Mare Street the median Zone A price is £405, with a typical spread of £27.50, so your price sits well above the street norm. Similar shops nearby are valued lower: 1001011 at £445 per m2 (25 m away), 1001009 at £410 (70 m), 1001006 at £400 (135 m) and 1001004 at £390 (180 m). We left out one comparable, 1001008 at £550 (90 m), because its price is more than five spreads above the street median and is not typical of the street. The median of the four shops we used is £405 per m2. Applying that to your 60.75 m2 gives a proposed rateable value of £24,604, compared with the current £27,338. This is based on comparing your shop with similar neighbouring properties. The valuation office will review it and we cannot promise the outcome.",
+    "calc": {
+      "street_median": 405,
+      "street_spread": 27.5,
+      "zone_a_price": 450
+    },
+    "comparables": [
+      {
+        "distance_m": 25,
+        "uarn": "1001011",
+        "use": "shop",
+        "zone_a_price": 445
+      },
+      {
+        "distance_m": 70,
+        "uarn": "1001009",
+        "use": "shop",
+        "zone_a_price": 410
+      },
+      {
+        "distance_m": 135,
+        "uarn": "1001006",
+        "use": "shop",
+        "zone_a_price": 400
+      },
+      {
+        "distance_m": 180,
+        "uarn": "1001004",
+        "use": "shop",
+        "zone_a_price": 390
+      }
+    ],
+    "current_rv": 27338,
+    "exclusions": [
+      {
+        "distance_m": 90,
+        "reason": "Zone A price of 550 is over five spreads above the street median of 405, so it is an outlier and not a fair comparison.",
+        "uarn": "1001008",
+        "zone_a_price": 550
+      }
+    ],
+    "proposed_rv": 24604,
+    "uarn": "1001012",
+    "case_id": "c_0003",
+    "version": "builder-v1",
+    "annual_saving": 1044
+  }
+}

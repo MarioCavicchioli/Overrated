@@ -34,7 +34,7 @@ create table if not exists verdicts (
   id         bigint generated always as identity primary key,
   case_id    text not null references packs(case_id),
   verdict    text not null check (verdict in ('survive', 'kill')),
-  reasons    jsonb not null,                    -- [{reason, voa_record}]
+  reasons    jsonb not null,                    -- [{reason, voa_record, kind}]
   version    text not null,
   created_at timestamptz not null default now()
 );

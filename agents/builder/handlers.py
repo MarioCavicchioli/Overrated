@@ -52,16 +52,11 @@ class BuilderHandlers:
 
     # -- data service ----------------------------------------------------
     def _data_tool(self, name: str, args: dict[str, Any]) -> str:
-        try:
-            result = getattr(self.data, name)(**args)
-        except NotFound as e:
-            return f"ERROR: {e}"
-        except TypeError as e:
-            return f"ERROR: bad arguments for {name}: {e}"
-        size = len(result) if isinstance(result, list) else 1
-        self.store.add_event(AGENT, "tool", f"{name} {_short(args)} -> {size} result(s)")
-        return (f'<data_service_result tool="{name}">\n'
-                f"{json.dumps(result, indent=1)}\n</data_service_result>")
+        text, result = run_data_tool(self.data, name, args)
+        if result is not None:
+            size = len(result) if isinstance(result, list) else 1
+            self.store.add_event(AGENT, "tool", f"{name} {_short(args)} -> {size} result(s)")
+        return text
 
     def _eligible(self, args: dict[str, Any]) -> str:
         try:
@@ -135,6 +130,22 @@ class BuilderHandlers:
         self.store.set_candidate_status(uarn, "no_case")
         self.store.add_event(AGENT, "no_case", f"{uarn}: {reason}")
         return "Recorded: dropped by builder. Your work on this candidate is done."
+
+
+def run_data_tool(data: DataClient, name: str, args: dict[str, Any]) -> tuple[str, Any]:
+    """Call one of the four read-only data tools. Returns the text for the model,
+    wrapped in <data_service_result> tags, and the raw result (None on error).
+    Shared by every agent that has the data tools."""
+    if name not in DATA_TOOLS:
+        return f"ERROR: unknown tool {name}", None
+    try:
+        result = getattr(data, name)(**args)
+    except NotFound as e:
+        return f"ERROR: {e}", None
+    except TypeError as e:
+        return f"ERROR: bad arguments for {name}: {e}", None
+    return (f'<data_service_result tool="{name}">\n'
+            f"{json.dumps(result, indent=1)}\n</data_service_result>"), result
 
 
 def _short(args: dict[str, Any]) -> str:

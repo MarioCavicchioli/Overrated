@@ -1,0 +1,57 @@
+{
+  "_source": "packs row c_0002 from the p2-cases store, built 2026-10-15T10:38:50.490Z by builder-v1",
+  "pack": {
+    "address": "137 Mare Street, Hackney, London E8 3RH",
+    "argument": "Your shop at 137 Mare Street is currently valued using a Zone A price of £550 per square metre, giving a rateable value of £35,475. Zone A is the first 6.1 metres from the front window, and it is the rate from which the other zones are worked out. We compared this with every similar shop of comparable size on the same stretch of Mare Street, all within 115 metres. They are valued at: 1001009 at £410 (20 m away), 1001006 at £400 (45 m), 1001011 at £445 (65 m), 1001004 at £390 (90 m), 1001012 at £450 (90 m) and 1001003 at £420 (115 m). We left none of them out. The middle value of these is £415. The street as a whole has a median Zone A price of £405, with a typical variation of about £27.50, so your £550 sits well above what neighbouring shops pay. Your shop has an area in terms of Zone A of 64.5 square metres (44 for Zone A, 16 for Zone B and 4.5 for Zone C). Applying £415 to that gives a proposed rateable value of £26,768, compared with £35,475 now. We believe this is a fair reflection of how similar nearby shops are valued, although the outcome is for the valuation office to decide.",
+    "calc": {
+      "street_median": 405,
+      "street_spread": 27.5,
+      "zone_a_price": 550
+    },
+    "comparables": [
+      {
+        "distance_m": 20,
+        "uarn": "1001009",
+        "use": "shop",
+        "zone_a_price": 410
+      },
+      {
+        "distance_m": 45,
+        "uarn": "1001006",
+        "use": "shop",
+        "zone_a_price": 400
+      },
+      {
+        "distance_m": 65,
+        "uarn": "1001011",
+        "use": "shop",
+        "zone_a_price": 445
+      },
+      {
+        "distance_m": 90,
+        "uarn": "1001004",
+        "use": "shop",
+        "zone_a_price": 390
+      },
+      {
+        "distance_m": 90,
+        "uarn": "1001012",
+        "use": "shop",
+        "zone_a_price": 450
+      },
+      {
+        "distance_m": 115,
+        "uarn": "1001003",
+        "use": "shop",
+        "zone_a_price": 420
+      }
+    ],
+    "current_rv": 35475,
+    "exclusions": [],
+    "proposed_rv": 26768,
+    "uarn": "1001008",
+    "case_id": "c_0002",
+    "version": "builder-v1",
+    "annual_saving": 3326
+  }
+}

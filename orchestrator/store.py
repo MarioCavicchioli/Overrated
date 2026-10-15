@@ -31,6 +31,8 @@ class Store(Protocol):
     def insert_pack(self, row: dict[str, Any]) -> None: ...
     def get_pack(self, case_id: str) -> dict[str, Any] | None: ...
     def save_pdf(self, case_id: str, data: bytes) -> str: ...
+    def insert_verdict(self, row: dict[str, Any]) -> None: ...
+    def list_verdicts(self, case_id: str) -> list[dict[str, Any]]: ...
     def add_event(self, agent: str, kind: str, message: str,
                   case_id: str | None = None, tokens: int = 0) -> None: ...
     def list_events(self, limit: int = 50) -> list[dict[str, Any]]: ...
@@ -106,6 +108,15 @@ class SQLiteStore:
         path = self.pdf_dir / f"{case_id}.pdf"
         path.write_bytes(data)
         return path.as_uri()
+
+    # -- verdicts --------------------------------------------------------
+    def insert_verdict(self, row: dict[str, Any]) -> None:
+        self._insert("verdicts", row)
+
+    def list_verdicts(self, case_id: str) -> list[dict[str, Any]]:
+        rows = self.db.execute(
+            "select * from verdicts where case_id = ? order by id", (case_id,)).fetchall()
+        return [self._decode(r) for r in rows]
 
     # -- events ----------------------------------------------------------
     def add_event(self, agent: str, kind: str, message: str,
