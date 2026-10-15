@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "overrated/pack.schema.json",
+  "title": "Evidence pack",
+  "description": "One case built by a Case builder, judged by the VOA advocate. Every comparable must come from the data service.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id", "uarn", "address", "current_rv", "proposed_rv",
+    "comparables", "calc", "annual_saving", "argument", "version"
+  ],
+  "properties": {
+    "case_id": { "type": "string", "pattern": "^c_[0-9]{4,}$" },
+    "uarn": { "type": "string", "description": "VOA unique address reference number of the subject property" },
+    "address": { "type": "string" },
+    "current_rv": { "type": "integer", "minimum": 0, "description": "Current rateable value, GBP" },
+    "proposed_rv": { "type": "integer", "minimum": 0, "description": "Rateable value we argue for, GBP; must be below current_rv" },
+    "comparables": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["uarn", "zone_a_price", "distance_m", "use"],
+        "properties": {
+          "uarn": { "type": "string" },
+          "zone_a_price": { "type": "number", "minimum": 0, "description": "GBP per m2, Zone A" },
+          "distance_m": { "type": "number", "minimum": 0 },
+          "use": { "type": "string", "description": "VOA description, e.g. cafe, shop" }
+        }
+      }
+    },
+    "calc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zone_a_price", "street_median", "street_spread"],
+      "properties": {
+        "zone_a_price": { "type": "number", "description": "Subject's current Zone A price, GBP/m2" },
+        "street_median": { "type": "number", "description": "Median Zone A price on the street segment" },
+        "street_spread": { "type": "number", "description": "Spread (e.g. MAD) of Zone A prices on the segment" }
+      }
+    },
+    "annual_saving": { "type": "integer", "minimum": 0, "description": "(current_rv - proposed_rv) x multiplier, GBP per year" },
+    "argument": { "type": "string", "minLength": 50, "description": "Plain-English case" },
+    "version": { "type": "string", "description": "Builder version that produced the pack, e.g. builder-v1" }
+  },
+  "examples": [
+    {
+      "case_id": "c_0001",
+      "uarn": "<VOA property id>",
+      "address": "<address>",
+      "current_rv": 40000,
+      "proposed_rv": 30800,
+      "comparables": [
+        { "uarn": "<id1>", "zone_a_price": 400, "distance_m": 60, "use": "cafe" },
+        { "uarn": "<id2>", "zone_a_price": 410, "distance_m": 85, "use": "cafe" },
+        { "uarn": "<id3>", "zone_a_price": 395, "distance_m": 120, "use": "cafe" }
+      ],
+      "calc": { "zone_a_price": 520, "street_median": 400, "street_spread": 35 },
+      "annual_saving": 3500,
+      "argument": "<plain-English case>",
+      "version": "builder-v1"
+    }
+  ]
+}

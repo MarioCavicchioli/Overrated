@@ -1,0 +1,27 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# VOA data: licence is rating purposes only, never commit
+data/raw/
+*.parquet
+*.duckdb
+*.duckdb.wal
+*.csv.zip
+*.zip
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# node
+node_modules/
+
+# misc
+.DS_Store
+*.log
+out/
