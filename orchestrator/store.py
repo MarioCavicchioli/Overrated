@@ -43,9 +43,13 @@ class Store(Protocol):
     def insert_case(self, row: dict[str, Any]) -> None: ...
     def get_case(self, case_id: str) -> dict[str, Any] | None: ...
     def update_case(self, case_id: str, changes: dict[str, Any]) -> None: ...
+    def list_cases(self, stages: tuple[str, ...]) -> list[dict[str, Any]]: ...
     def add_event(self, agent: str, kind: str, message: str,
-                  case_id: str | None = None, tokens: int = 0) -> None: ...
+                  case_id: str | None = None, tokens: int = 0,
+                  ts: str | None = None) -> None: ...
     def count_events(self, kind: str, case_id: str) -> int: ...
+    def last_event(self, kind: str, case_id: str | None = None) -> dict[str, Any] | None: ...
+    def events_after(self, kind: str, after_id: int, limit: int = 200) -> list[dict[str, Any]]: ...
     def list_events(self, limit: int = 50) -> list[dict[str, Any]]: ...
 
 
@@ -158,6 +162,15 @@ class SQLiteStore:
         self._write(f"update cases set {sets}, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
                     "where case_id = ?", [*row.values(), case_id])
 
+    def list_cases(self, stages: tuple[str, ...]) -> list[dict[str, Any]]:
+        marks = ", ".join("?" for _ in stages)
+        rows = self._query(f"select * from cases where stage in ({marks}) order by case_id",
+                           tuple(stages))
+        out = [self._decode(r) for r in rows]
+        for c in out:
+            c["owner_approved"] = bool(c["owner_approved"])
+        return out
+
     def save_pdf(self, case_id: str, data: bytes) -> str:
         path = self.pdf_dir / f"{case_id}.pdf"
         path.write_bytes(data)
@@ -165,13 +178,29 @@ class SQLiteStore:
 
     # -- events ----------------------------------------------------------
     def add_event(self, agent: str, kind: str, message: str,
-                  case_id: str | None = None, tokens: int = 0) -> None:
-        self._insert("events", {"agent": agent, "kind": kind, "message": message,
-                                "case_id": case_id, "tokens": tokens})
+                  case_id: str | None = None, tokens: int = 0,
+                  ts: str | None = None) -> None:
+        row = {"agent": agent, "kind": kind, "message": message,
+               "case_id": case_id, "tokens": tokens}
+        if ts:   # the scheduler stamps its own events with its clock
+            row["ts"] = ts
+        self._insert("events", row)
 
     def count_events(self, kind: str, case_id: str) -> int:
         return self._query("select count(*) from events where kind = ? and case_id = ?",
                            (kind, case_id))[0][0]
+
+    def last_event(self, kind: str, case_id: str | None = None) -> dict[str, Any] | None:
+        if case_id is None:
+            return self._one("select * from events where kind = ? order by id desc limit 1",
+                             (kind,))
+        return self._one("select * from events where kind = ? and case_id = ? "
+                         "order by id desc limit 1", (kind, case_id))
+
+    def events_after(self, kind: str, after_id: int, limit: int = 200) -> list[dict[str, Any]]:
+        rows = self._query("select * from events where kind = ? and id > ? order by id limit ?",
+                           (kind, after_id, limit))
+        return [self._decode(r) for r in rows]
 
     def list_events(self, limit: int = 50) -> list[dict[str, Any]]:
         rows = self._query("select * from events order by id desc limit ?", (limit,))
@@ -179,9 +208,10 @@ class SQLiteStore:
 
 
 def get_store() -> Store:
-    backend = os.getenv("STORE_BACKEND", "sqlite")
+    backend = os.getenv("STORE_BACKEND") or "sqlite"
     if backend == "sqlite":
         return SQLiteStore()
     if backend == "supabase":
-        raise NotImplementedError("Supabase backend arrives in step 4")
+        from orchestrator.supabase_store import SupabaseStore
+        return SupabaseStore()
     raise ValueError(f"unknown STORE_BACKEND {backend!r}")

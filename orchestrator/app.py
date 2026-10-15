@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from orchestrator.cases import ApprovalError, approve_case, risk_line
 from orchestrator.config import load_env
 from orchestrator.pipeline import Pipeline
+from orchestrator.schedules import Scheduler
 from orchestrator.store import Store, get_store
 
 load_env()
@@ -28,11 +29,13 @@ load_env()
 async def lifespan(app: FastAPI):
     app.state.store = get_store()
     app.state.pipeline = Pipeline(app.state.store)
-    task = None
+    app.state.scheduler = Scheduler(app.state.store)
+    tasks = []
     if os.getenv("WATCH_DISABLED") != "1":
-        task = asyncio.create_task(app.state.pipeline.watch())
+        tasks = [asyncio.create_task(app.state.pipeline.watch()),
+                 asyncio.create_task(app.state.scheduler.watch())]
     yield
-    if task:
+    for task in tasks:
         task.cancel()
 
 
