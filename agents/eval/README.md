@@ -28,3 +28,16 @@ Owner: person 1. Scores each Scout / playbook version on real outcomes first. La
 Hackney has 40 hits in scope, too few to measure; use the national score for the eval and the hill climb. Nationally the top 50 is all Bond Street and Oxford Street, because the score is est_saving and it favours the biggest RVs.
 
 Layers 2 (pack checks in code) and 3 (advocate accuracy on tribunal cases) are not built yet.
+
+## Hill climb (15 Oct)
+
+`hillclimb.py` tries one rule change at a time on top of the best version so far, keeps it only if train lift at 50 rises (lift at 200 breaks ties), and reports held-out without using it. Kept versions go to `eval_runs` and `versions/<version>.json`.
+
+| Version | Change | Train lift@50 | Held-out lift@50 |
+|---|---|---|---|
+| pb-v1 | Scout defaults | 2.47 | 1.57 |
+| pb-v2 | priced runs (segment_cluster) drop to the bottom | 3.31 | 1.59 |
+
+Rejected on train: ranking by z (train 0.0: the most extreme outliers are data quirks, never cut), by % above median (1.02), by sqrt(saving) x z (1.90), segment size 3 or 8, z >= 1.5 or 3, spread floor 2% or 10%, saving floors £0 or £5k. Ranking by saving wins, likely because big rents are the ones owners appeal.
+
+Caveat: 50 picks means 5 to 12 hits, so one or two hits move lift by 0.2 to 0.4, and held-out moved between 0.5 and 2.5 across the trials. Gate future playbooks on lift at 200 or candidate precision as well, not lift at 50 alone.

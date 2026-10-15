@@ -35,6 +35,7 @@ DEFAULT_RULES = {
     "cluster_size": 3,       # this many shops at one high price in a segment = a priced run
     "cluster_factor": 0.5,   # score multiplier for priced runs
     "spread_floor": 0.05,    # spread is at least this share of the segment median
+    "rank_by": "saving",     # saving | z | excess_pct | saving_x_z: what orders the candidates
 }
 
 
@@ -56,7 +57,7 @@ def multiplier(rv):
     return 0.499 if rv < 51000 else 0.512
 
 
-def load(ba, rules):
+def load(ba):
     """April 2023 shops in scope, scored against every shop in their segment (which can cross a borough line)."""
     con = duckdb.connect()
     scope = "" if ba == "all" else f"and ba_code = '{ba}'"
@@ -73,11 +74,11 @@ def load(ba, rules):
     """)
     rows = con.execute(f"""
         select s.uarn, s.address, s.street_key, s.segment_key, s.rv, s.total_area, s.zone_a_price, s.itza,
-               g.n seg_n, g.med seg_median, greatest(1.4826 * m.mad, {rules['spread_floor']} * g.med) seg_spread
+               g.n seg_n, g.med seg_median, m.mad seg_mad
         from scoped s join seg g using (segment_key) join seg_mad m using (segment_key)
     """).fetchall()
     cols = ["uarn", "address", "street_key", "segment_key", "rv", "total_area", "zone_a_price", "itza",
-            "seg_n", "seg_median", "seg_spread"]
+            "seg_n", "seg_median", "seg_mad"]
     shops = [dict(zip(cols, r)) for r in rows]
 
     # Answer key: later cut, same floor area, effective from the list start.
@@ -94,6 +95,7 @@ def load(ba, rules):
 def score(shops, rules):
     """Apply the Scout's rules; returns shops ranked best first, with score and flags."""
     for s in shops:
+        s["seg_spread"] = max(1.4826 * (s["seg_mad"] or 0), rules["spread_floor"] * s["seg_median"])
         s["z"] = (s["zone_a_price"] - s["seg_median"]) / s["seg_spread"] if s["seg_spread"] else 0
         drop = max(s["zone_a_price"] - s["seg_median"], 0) * (s["itza"] or 0)
         proposed = max(s["rv"] - drop, 0)
@@ -111,13 +113,25 @@ def score(shops, rules):
     for s in shops:
         if "zone_a_above_tone" in s["flags"] and runs[s["segment_key"]][s["zone_a_price"]] >= rules["cluster_size"]:
             s["flags"].append("segment_cluster")
-        s["score"] = (s["est_saving"] if "zone_a_above_tone" in s["flags"] else 0) * (
+        base = {
+            "saving": s["est_saving"],
+            "z": s["z"],
+            "excess_pct": s["zone_a_price"] / s["seg_median"] - 1 if s["seg_median"] else 0,
+            "saving_x_z": max(s["est_saving"], 0) ** 0.5 * max(s["z"], 0),
+        }[rules["rank_by"]]
+        s["score"] = (base if "zone_a_above_tone" in s["flags"] else 0) * (
             rules["cluster_factor"] if "segment_cluster" in s["flags"] else 1)
     # candidates first (by score), then everything else by z, so there are always 50 picks
     return sorted(shops, key=lambda s: (not s["flags"], -s["score"], -s["z"]))
 
 
 def metrics(ranked, hits, k=50):
+    m = _metrics(ranked, hits, k)
+    m["lift_at_200"] = _metrics(ranked, hits, 200)["lift_at_200"]
+    return m
+
+
+def _metrics(ranked, hits, k):
     top = ranked[:k]
     top_hits = sum(1 for s in top if s["uarn"] in hits)
     streets = {s["street_key"] for s in top}
@@ -166,7 +180,7 @@ def main():
 
     load_env()
     rules = {**DEFAULT_RULES, **(json.load(open(args.rules)) if args.rules else {})}
-    shops, hits = load(args.ba, rules)
+    shops, hits = load(args.ba)
     by_split = defaultdict(list)
     for s in shops:
         by_split[split_of(s["street_key"])].append(s)
