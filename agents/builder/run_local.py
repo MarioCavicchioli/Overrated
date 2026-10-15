@@ -19,9 +19,9 @@ import sys
 from pathlib import Path
 
 from agents.builder.handlers import AGENT, BuilderHandlers
-from orchestrator import budget
 from orchestrator.config import anthropic_client, load_env, trace_url
 from orchestrator.data_client import DataClient
+from orchestrator.sessions import run_session
 from orchestrator.store import Store, get_store
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -58,58 +58,23 @@ def run(uarn: str) -> None:
     handlers = BuilderHandlers(store, data)
     ensure_candidate(store, data, uarn)
 
-    session = client.beta.sessions.create(
+    def tool(name: str, args: dict) -> str:
+        print(f"  -> {name} {json.dumps(args)[:160]}")
+        result = handlers.handle(name, args)
+        print(f"  <- {result.splitlines()[0][:160]}")
+        return result
+
+    result = run_session(
+        client, store,
         agent=resource_id("BUILDER_AGENT_ID", "./agents/builder/agent.md"),
         environment_id=resource_id("BUILDER_ENV_ID", "./agents/builder/environment.yaml"),
-        title=f"builder test {uarn}",
-        budget=budget.platform_budget(MODEL),
+        model=MODEL, agent_name=AGENT, kickoff=f"Candidate UARN: {uarn}",
+        tool_handler=tool, title=f"builder test {uarn}", on_text=print,
     )
-    store.add_event(AGENT, "session_started", f"test session for {uarn}")
-    print(f"Session {session.id}\nTrace: {trace_url(session.id)}\n")
-
-    meter = budget.SpendMeter()
-    stop_reason = "unknown"
-    with client.beta.sessions.events.stream(session_id=session.id) as stream:
-        client.beta.sessions.events.send(session_id=session.id, events=[{
-            "type": "user.message",
-            "content": [{"type": "text", "text": f"Candidate UARN: {uarn}"}],
-        }])
-        for event in stream:
-            if event.type == "agent.message":
-                for block in event.content:
-                    if block.type == "text":
-                        print(block.text, flush=True)
-            elif event.type == "agent.custom_tool_use":
-                print(f"  -> {event.name} {json.dumps(event.input)[:160]}")
-                result = handlers.handle(event.name, event.input)
-                print(f"  <- {result.splitlines()[0][:160]}")
-                client.beta.sessions.events.send(session_id=session.id, events=[{
-                    "type": "user.custom_tool_result",
-                    "custom_tool_use_id": event.id,
-                    "content": [{"type": "text", "text": result}],
-                }])
-            elif event.type == "span.model_request_end":
-                meter.add(event.model_usage)
-                if reason := meter.exceeded:
-                    store.add_event(AGENT, "budget_stop", f"{uarn}: {reason}", tokens=meter.tokens)
-                    client.beta.sessions.events.send(
-                        session_id=session.id, events=[{"type": "user.interrupt"}])
-                    stop_reason = reason
-                    break
-            elif event.type == "session.status_idle":
-                if event.stop_reason.type != "requires_action":
-                    stop_reason = event.stop_reason.type
-                    break
-            elif event.type == "session.status_terminated":
-                stop_reason = "terminated"
-                break
-
-    store.add_event(AGENT, "session_spend",
-                    f"{uarn}: {meter.tokens:,} tokens over {meter.turns} model requests "
-                    f"({stop_reason})", tokens=meter.tokens)
     cand = store.get_candidate(uarn)
-    print(f"\nStopped: {stop_reason}. Tokens: {meter.tokens:,}. "
-          f"Candidate status: {cand['status'] if cand else '?'}")
+    print(f"\nSession {result.session_id}: {trace_url(result.session_id)}\n"
+          f"Stopped: {result.stop_reason}. Tokens: {result.tokens:,}, "
+          f"{result.list_cost_cents} cents. Candidate status: {cand['status'] if cand else '?'}")
 
 
 if __name__ == "__main__":
