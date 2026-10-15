@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from orchestrator.config import load_env
-from orchestrator.data_client import VoaDataClient
+from orchestrator.data_client import VoaDataClient, segment
 
 FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "voa_service_responses.json"
 
@@ -40,11 +40,12 @@ def main(uarn: str) -> int:
     sample = {"get_valuation": fixture["/get_valuation/900000001"],
               "comparables": fixture["/comparables/900000001"],
               "street_tone": next(v for k, v in fixture.items() if k.startswith("/street_tone"))}
-    live_val = client._get(f"/get_valuation/{uarn}")
-    segment = (live_val.get("shop") or {}).get("segment_key")
+    live_val = client._get(f"/get_valuation/{segment(uarn)}")
+    segment_key = (live_val.get("shop") or {}).get("segment_key")
     live = {"get_valuation": live_val,
-            "comparables": client._get(f"/comparables/{uarn}", n=20),
-            "street_tone": client._get("/street_tone", segment_key=segment) if segment else {}}
+            "comparables": client._get(f"/comparables/{segment(uarn)}", n=20),
+            "street_tone": (client._get("/street_tone", segment_key=segment_key)
+                            if segment_key else {})}
     missing_any = False
     for name in sample:
         have, want = paths(live[name]), paths(sample[name])

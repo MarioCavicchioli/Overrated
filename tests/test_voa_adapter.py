@@ -148,6 +148,37 @@ def test_search_filters_use(voa):
     assert "900000003" not in {r["uarn"] for r in rows}                  # plain "SHOP" left out
 
 
+MALICIOUS = ["../admin", "..", ".", "9000/../../scan", "1?ba_code=5360&limit=5000",
+             "1#frag", "%2e%2e%2fadmin", "1/2"]
+
+
+@pytest.mark.parametrize("uarn", MALICIOUS)
+@pytest.mark.parametrize("backend", ["mock", "http"])
+def test_uarn_cannot_leave_its_path_segment(uarn, backend):
+    """An agent-supplied UARN stays one encoded segment under its endpoint: it can't
+    reach another endpoint (e.g. /scan, bulk VOA data) or add a query string."""
+    seen: list[httpx.Request] = []
+
+    def capture(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(404, json={"detail": "not found"})
+
+    http = httpx.Client(base_url="http://data.test", headers={"X-API-Key": KEY},
+                        transport=httpx.MockTransport(capture))
+    data = data_client.DataClient(http=http) if backend == "mock" else VoaDataClient(http=http)
+    for call, prefix in ((data.get_valuation, b"/get_valuation/"),
+                         (data.comparables, b"/comparables/")):
+        with pytest.raises(NotFound):
+            call(uarn)
+        raw = seen[-1].url.raw_path
+        path, _, query = raw.partition(b"?")
+        assert path.startswith(prefix), raw
+        rest = path[len(prefix):]
+        assert rest and b"/" not in rest and b"." not in rest, raw     # one segment, no dots
+        assert b"ba_code" not in query and b"limit=5000" not in query, raw
+        assert unquote(rest.decode()) == uarn                           # the server sees it as-is
+
+
 def test_backend_setting(monkeypatch):
     monkeypatch.setenv("DATA_SERVICE_URL", "http://voa.test")
     monkeypatch.setenv("DATA_SERVICE_KEY", KEY)

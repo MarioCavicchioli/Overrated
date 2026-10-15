@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -29,6 +30,14 @@ TIMEOUT_S = float(os.getenv("DATA_SERVICE_TIMEOUT_S") or "20")
 
 class NotFound(Exception):
     pass
+
+
+def segment(value: Any) -> str:
+    """One URL path segment. UARNs and street keys can come from an agent's tool call,
+    so "/", "?", "#" and "%" are encoded (quote with safe=""), and so are dots: quote
+    leaves them, and a bare ".." segment would be resolved away by the URL parser,
+    reaching a different endpoint on the data service."""
+    return quote(str(value), safe="").replace(".", "%2E")
 
 
 class DataClient:
@@ -64,15 +73,15 @@ class DataClient:
                          postcode=postcode, limit=limit)
 
     def get_valuation(self, uarn: str) -> dict:
-        return self._get(f"/get_valuation/{uarn}")
+        return self._get(f"/get_valuation/{segment(uarn)}")
 
     def comparables(self, uarn: str, max_distance: float | None = None,
                     same_use: bool | None = None, limit: int | None = None) -> list[dict]:
-        return self._get(f"/comparables/{uarn}", max_distance=max_distance,
+        return self._get(f"/comparables/{segment(uarn)}", max_distance=max_distance,
                          same_use=same_use, limit=limit)
 
     def street_tone(self, street_key: str) -> dict:
-        return self._get(f"/street_tone/{street_key}")
+        return self._get(f"/street_tone/{segment(street_key)}")
 
 
 # -- Person 1's data service -------------------------------------------------------
@@ -124,7 +133,7 @@ class VoaDataClient(DataClient):
         return out
 
     def get_valuation(self, uarn: str) -> dict:
-        raw = self._get(f"/get_valuation/{uarn}")
+        raw = self._get(f"/get_valuation/{segment(uarn)}")
         shop, entry = raw.get("shop"), raw["entry"]
         if shop is None:
             # On the list, but no zoned shop valuation: not something we can compare.
@@ -145,7 +154,7 @@ class VoaDataClient(DataClient):
 
     def comparables(self, uarn: str, max_distance: float | None = None,
                     same_use: bool | None = None, limit: int | None = None) -> list[dict]:
-        raw = self._get(f"/comparables/{uarn}", n=COMPARABLES_MAX)
+        raw = self._get(f"/comparables/{segment(uarn)}", n=COMPARABLES_MAX)
         subject_class = raw["subject"].get("scat_code")
         out = []
         for row in raw["comparables"]:
