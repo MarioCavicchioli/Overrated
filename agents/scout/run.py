@@ -1,23 +1,36 @@
 """Start a Scout session on a target borough and follow it until it finishes.
 
-Run: .venv/bin/python agents/scout/run.py [--ba-code 5360 --name Hackney]
-Needs `ant apply` done (IDs in claude-lock.json, or SCOUT_AGENT_ID / SCOUT_ENV_ID /
-VAULT_ID in .env) and the credentials added with add_credentials.py.
+Run: .venv/bin/python agents/scout/run.py [--ba-code 5360 --name Hackney] [--handoff-limit 2]
+
+Where it runs:
+- 'overrated' (default when OVERRATED_API_KEY is in .env): Person 2's workspace, next to their Case
+  builder, with ids from agents/scout/claude-lock.json and the key + workspace id from .env.
+- 'legacy': the first deployment in the 'Claude Code' workspace (root claude-lock.json, `ant` profile).
+
+The Case builder runs as threads inside the Scout's session. Its tools are custom tools, so their
+calls arrive on this stream and are answered here with Person 2's ScoutToolRouter (real data service
+via DATA_BACKEND=http, Supabase via STORE_BACKEND=supabase), exactly as orchestrator/sessions.py does.
 """
 import argparse
 import json
 import os
+import sys
 from datetime import datetime, timezone
 
 import anthropic
 import httpx
 
-SNAPSHOT = "voa-2026-compiled-epoch-0004"  # matches the data service
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-LOCK_KEYS = {
-    "SCOUT_AGENT_ID": "./agents/scout/agent.md",
-    "SCOUT_ENV_ID": "./agents/scout/environment.yaml",
-    "VAULT_ID": "./agents/scout/vault.yaml",
+sys.path.insert(0, ROOT)  # for Person 2's orchestrator package
+
+SNAPSHOT = "voa-2026-compiled-epoch-0004"  # matches the data service
+LOCKS = {
+    # workspace: (lockfile, {env var: resource key in that lockfile})
+    "overrated": (os.path.join(ROOT, "agents", "scout", "claude-lock.json"),
+                  {"SCOUT_AGENT_ID": "./agent.md", "SCOUT_ENV_ID": "./environment.yaml", "VAULT_ID": "./vault.yaml"}),
+    "legacy": (os.path.join(ROOT, "claude-lock.json"),
+               {"SCOUT_AGENT_ID": "./agents/scout/agent.md", "SCOUT_ENV_ID": "./agents/scout/environment.yaml",
+                "VAULT_ID": "./agents/scout/vault.yaml"}),
 }
 
 
@@ -28,17 +41,25 @@ def load_env():
             os.environ.setdefault(k, v)
 
 
-def resource_ids():
-    lock = {}
-    path = os.path.join(ROOT, "claude-lock.json")
-    if os.path.exists(path):
-        lock = json.load(open(path)).get("resources", {})
+def resource_ids(workspace):
+    path, keys = LOCKS[workspace]
+    lock = json.load(open(path)).get("resources", {}) if os.path.exists(path) else {}
     ids = {}
-    for var, key in LOCK_KEYS.items():
-        ids[var] = os.environ.get(var) or lock.get(key, {}).get("id")
+    for var, key in keys.items():
+        ids[var] = lock.get(key, {}).get("id") or (os.environ.get(var) if workspace == "legacy" else None)
         if not ids[var]:
-            raise SystemExit(f"{var} not set and {key} not in claude-lock.json; run ant apply first")
+            raise SystemExit(f"{var}: {key} not in {os.path.relpath(path, ROOT)}; run ant apply first (see README)")
     return ids
+
+
+def anthropic_client(workspace):
+    if workspace == "overrated":
+        key, ws = os.environ.get("OVERRATED_API_KEY"), os.environ.get("OVERRATED_WORKSPACE_ID")
+        if not (key and ws):
+            raise SystemExit("OVERRATED_API_KEY and OVERRATED_WORKSPACE_ID must be in .env")
+        return anthropic.Anthropic(api_key=key, default_headers={"anthropic-workspace-id": ws})
+    ws = os.environ.get("ANTHROPIC_WORKSPACE_ID")  # needed when the API key isn't scoped to one workspace
+    return anthropic.Anthropic(default_headers={"anthropic-workspace-id": ws} if ws else None)
 
 
 def budget_cents():
@@ -93,7 +114,7 @@ def log_event(kind, message, run_id=None, tokens=None, cost_usd=None, payload=No
     })
 
 
-def kickoff(ba_code, name, run_id):
+def kickoff(ba_code, name, run_id, handoff_limit):
     lines = [
         f"Target: the London Borough of {name}, billing authority code {ba_code}.",
         f"Data service base URL: {os.environ['DATA_SERVICE_URL']}",
@@ -103,23 +124,44 @@ def kickoff(ba_code, name, run_id):
         lines.append(f"run_id: {run_id}")
     else:
         lines.append("Supabase is not set up yet: write rows to /mnt/session/outputs/ instead.")
+    if handoff_limit is not None:
+        lines.append(f"Hand-off limit: give the Case builder at most {handoff_limit} candidates this run, "
+                     "highest score first; leave the rest flagged.")
     lines.append("Run the sweep as your instructions describe, then report.")
     return "\n".join(lines)
+
+
+def builder_router():
+    """Person 2's router for the Case builder's custom tools (real data service, Supabase store)."""
+    os.environ.setdefault("DATA_BACKEND", "http")
+    os.environ.setdefault("STORE_BACKEND", "supabase")
+    from orchestrator.data_client import make_data_client
+    from orchestrator.scout_tools import ScoutToolRouter
+    from orchestrator.store import get_store
+    store = get_store()
+    return store, ScoutToolRouter(store, make_data_client())
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ba-code", default="5360")
     ap.add_argument("--name", default="Hackney")
+    ap.add_argument("--handoff-limit", type=int, default=None,
+                    help="hand at most this many candidates to the Case builder (for test runs)")
+    ap.add_argument("--workspace", choices=["overrated", "legacy"], default=None,
+                    help="default: overrated when OVERRATED_API_KEY is in .env, else legacy")
     args = ap.parse_args()
 
     load_env()
-    ids = resource_ids()
-    ws = os.environ.get("ANTHROPIC_WORKSPACE_ID")  # needed when the API key isn't scoped to one workspace
-    client = anthropic.Anthropic(default_headers={"anthropic-workspace-id": ws} if ws else None)
+    workspace = args.workspace or ("overrated" if os.environ.get("OVERRATED_API_KEY") else "legacy")
+    ids = resource_ids(workspace)
+    client = anthropic_client(workspace)
+    store, router = builder_router()
+    # Person 2's own answer function, so the reply payload is identical to their orchestrator's.
+    from orchestrator.sessions import _answer_tool
+
     cents = budget_cents()
     run_id = start_run(args.ba_code, args.name)
-
     session = client.beta.sessions.create(
         agent=ids["SCOUT_AGENT_ID"],
         environment_id=ids["SCOUT_ENV_ID"],
@@ -128,49 +170,65 @@ def main():
         budget={"type": "limit", "max_list_cost": {"amount": str(cents), "currency": "USD"}},
         metadata={"agent": "scout", "target": f"ba{args.ba_code}", "run_id": run_id or ""},
     )
-    print(f"session {session.id} (budget ${cents / 100:.2f}, run_id {run_id or 'none: no Supabase'})")
-    print(f"watch: https://platform.claude.com/workspaces/default/sessions/{session.id}")
+    print(f"session {session.id} in {workspace} (budget ${cents / 100:.2f}, run_id {run_id or 'none: no Supabase'})")
     log_event("session_started", f"Scout session on {args.name}, budget ${cents / 100:.2f}", run_id,
-              payload={"session_id": session.id})
+              payload={"session_id": session.id, "workspace": workspace})
 
-    tokens = 0
+    tokens, open_runs, stop = 0, set(), "unknown"
     with client.beta.sessions.events.stream(session_id=session.id) as stream:
         client.beta.sessions.events.send(session_id=session.id, events=[
-            {"type": "user.message", "content": [{"type": "text", "text": kickoff(args.ba_code, args.name, run_id)}]},
+            {"type": "user.message", "content": [{"type": "text", "text": kickoff(
+                args.ba_code, args.name, run_id, args.handoff_limit)}]},
         ])
         for event in stream:
-            if event.type == "agent.message":
+            kind = event.type
+            if kind == "agent.message":
                 for block in event.content:
                     if block.type == "text":
                         print(block.text, flush=True)
-            elif event.type == "agent.tool_use":
+            elif kind == "agent.tool_use":
                 print(f"  [{event.name}]", flush=True)
-            elif event.type in ("session.thread_created", "session.thread_status_terminated"):
-                print(f"  {event.type}: {event.agent_name}", flush=True)
-            elif event.type == "span.model_request_end" and event.model_usage:
+            elif kind == "agent.custom_tool_use":
+                # A Case builder thread calling one of its data tools, submit_pack or no_case.
+                print(f"  builder -> {event.name} {json.dumps(event.input)[:120]}", flush=True)
+                text = _answer_tool(client, store, session.id, event, router, "builder", None)
+                print(f"  builder <- {text.splitlines()[0][:120] if text else ''}", flush=True)
+            elif kind in ("session.thread_created", "session.thread_status_terminated"):
+                print(f"  {kind}: {event.agent_name}", flush=True)
+            elif kind == "workflow_run.created":
+                open_runs.add(event.workflow_run_id)
+            elif kind == "workflow_run.status_ended":
+                open_runs.discard(event.workflow_run_id)
+            elif kind == "span.model_request_end" and event.model_usage:
                 u = event.model_usage
                 tokens += (u.input_tokens or 0) + (u.output_tokens or 0) + (u.cache_creation_input_tokens or 0)
-            elif event.type == "session.error":
+            elif kind == "session.error":
                 print(f"  session error: {event}", flush=True)
 
-            if (event.type in ("agent.tool_use", "agent.mcp_tool_use")
-                    and getattr(event, "evaluated_permission", None) == "ask"):
+            if kind in ("agent.tool_use", "agent.mcp_tool_use") and getattr(event, "evaluated_permission", None) == "ask":
                 # Unattended run: nothing the Scout needs should be ambiguous, so deny and say why.
                 client.beta.sessions.events.send(session_id=session.id, events=[{
                     "type": "user.tool_confirmation", "tool_use_id": event.id, "result": "deny",
                     "deny_message": "Unattended run: this call needs a human. Find another way or report it.",
                 }])
-            elif event.type == "session.status_terminated":
+            elif kind == "session.status_terminated":
+                stop = "terminated"
                 break
-            elif event.type == "session.status_idle" and event.stop_reason.type != "requires_action":
-                print(f"idle: {event.stop_reason.type}")
+            elif kind == "session.status_idle":
+                reason = event.stop_reason.type
+                if reason == "requires_action":
+                    continue
+                if reason == "end_turn" and open_runs:
+                    continue  # the Scout takes a turn on each run's ending notice
+                stop = reason
+                print(f"idle: {reason}")
                 break
 
-    usage = client.beta.sessions.retrieve(session.id).usage
+    usage = client.beta.sessions.retrieve(session.id).usage  # covers every thread, builders included
     cost = int(usage.list_cost.amount) / 100 if usage and usage.list_cost else None
-    print(f"tokens {tokens:,}; list cost ${cost}")
-    log_event("session_finished", f"Scout session finished: {tokens:,} tokens, ${cost}", run_id,
-              tokens=tokens, cost_usd=cost, payload={"session_id": session.id})
+    print(f"stopped: {stop}; tokens {tokens:,} on the Scout's own thread; session list cost ${cost}")
+    log_event("session_finished", f"Scout session finished ({stop}): ${cost} incl. builder threads", run_id,
+              tokens=tokens, cost_usd=cost, payload={"session_id": session.id, "stop_reason": stop})
 
 
 if __name__ == "__main__":
