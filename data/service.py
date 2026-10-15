@@ -48,6 +48,12 @@ for y in ("2026", "2023"):
     con.execute(f"""create view shops_{y} as select *,
         street_key || '#' || coalesce(scheme_ref, '') as segment_key
         from '{PQ}/shops_{y}.parquet'""")
+# House number: the first integer in the address part before the first comma, ignoring a leading
+# parenthesised clause and floor ordinals: '(INCL 1-9 HILLS PL) BST-3RD FLRS 215-219, ...' -> 215.
+con.execute(r"""create or replace macro house_no(_addr) as try_cast(regexp_extract(
+    regexp_replace(split_part(regexp_replace(upper(coalesce(_addr, '')), '^\s*(\([^)]*\)\s*)+', ''), ',', 1),
+                   '\d+(ST|ND|RD|TH)\b', '', 'g'),
+    '\d+') as bigint)""")
 
 app = FastAPI(title="Overrated data service")
 
@@ -160,6 +166,53 @@ def proposal(shop, t):
             "years_left": round(years_left(), 2)}
 
 
+# --- nearest-neighbour tone -------------------------------------------------------
+# The VOA prices blocks of a long street differently, so a shop can sit well above its segment
+# yet match the shops either side of it. Each shop is also compared with its nearest same-use shops.
+K_NEIGHBOURS = 4
+INFO_FLAGS = {"matches_neighbours"}  # describe a shop, never a reason to challenge: not counted as flagged
+
+
+def neighbours_cte(year, keys_sql, scat):
+    """CTEs ending in `nb` (uarn, local_n, local_median, neighbours) for every shop on the street keys that
+    `keys_sql` selects: its K_NEIGHBOURS nearest other shops with a Zone A price, the same SCAT code and the
+    same street_key (any scheme). Nearest = smallest house-number gap, then same postcode, then uarn; shops
+    with no house number at the same postcode fill in after those. A shop with no house number takes the
+    shops at its own postcode (numbered first, by number). Self-join within one street, so no O(n^2) scan."""
+    return f"""
+    nb_pool as (
+      select uarn, address, postcode, street_key, zone_a_price, house_no(address) num
+      from shops_{year}
+      where scat_code = {scat} and zone_a_price is not null and street_key in ({keys_sql})
+    ),
+    nb_rank as (
+      select a.uarn, b.uarn nb_uarn, b.address nb_address, b.zone_a_price nb_price,
+             row_number() over (partition by a.uarn order by
+               b.num is null, abs(a.num - b.num), a.postcode is distinct from b.postcode,
+               case when a.num is null then b.num end, b.uarn) rk
+      from nb_pool a join nb_pool b
+        on b.street_key = a.street_key and b.uarn <> a.uarn
+       and ((a.num is not null and b.num is not null) or a.postcode is not distinct from b.postcode)
+    ),
+    nb as (
+      select uarn, count(*) local_n, median(nb_price) local_median,
+             list({{'uarn': nb_uarn::varchar, 'address': nb_address, 'zone_a_price': nb_price}} order by rk) neighbours
+      from nb_rank where rk <= {K_NEIGHBOURS} group by uarn
+    )"""
+
+
+def local_fields(shop, spread, nb):
+    """local_median / local_z need at least 2 neighbours; local_z is in segment spreads, like z_score."""
+    n = (nb or {}).get("local_n") or 0
+    med = nb["local_median"] if n >= 2 else None
+    z = (shop["zone_a_price"] - med) / spread if med is not None and spread else None
+    return {"local_median": med, "local_n": n, "local_z": z, "neighbours": (nb or {}).get("neighbours") or []}
+
+
+def matches_neighbours(shop, local, spread):
+    return local["local_z"] is not None and abs(shop["zone_a_price"] - local["local_median"]) <= spread
+
+
 def get_shop(uarn, year="2026"):
     rows = q(f"select * from shops_{year} where uarn = $1", (uarn,))
     return rows[0] if rows else None
@@ -205,7 +258,12 @@ def get_valuation(uarn: int):
     if shop:
         t = tone(shop["segment_key"], shop["scat_code"])
         z, flags = flags_for(shop, t)
-        out.update(street_tone=t, z_score=z, flags=flags, proposal=proposal(shop, t))
+        nb = q(f"with {neighbours_cte('2026', '$1', '$2')} select local_n, local_median, neighbours from nb "
+               "where uarn = $3", (shop["street_key"], shop["scat_code"], uarn))
+        local = local_fields(shop, t["spread"], nb[0] if nb else None)
+        if matches_neighbours(shop, local, t["spread"]):
+            flags.append("matches_neighbours")
+        out.update(street_tone=t, z_score=z, flags=flags, proposal=proposal(shop, t), **local)
         if shop["postcode"]:
             out["latlng"] = geocode([shop["postcode"]])[shop["postcode"]]
     return out
@@ -318,25 +376,35 @@ def scan(area: str = Query("", description="postcode district or sector, e.g. SW
         m as (
           select x.segment_key, median(abs(x.zone_a_price - t.median)) mad
           from shops_{year} x join t using (segment_key) where x.scat_code = $2 group by 1
-        )
+        ),
+        {neighbours_cte(year, 'select street_key from s', '$2')}
         select s.uarn, s.address, s.postcode, s.street_key, s.segment_key, s.scheme_ref, s.ba_code,
                s.desc_text as "use", s.rv, s.total_area, s.zone_a_area, s.zone_a_price, s.itza, s.scat_code,
                t.n street_n, t.median street_median,
-               greatest(1.4826 * m.mad, 0.05 * t.median) street_spread
-        from s join t using (segment_key) join m using (segment_key)
+               greatest(1.4826 * m.mad, 0.05 * t.median) street_spread,
+               nb.local_n, nb.local_median, nb.neighbours
+        from s join t using (segment_key) join m using (segment_key) left join nb using (uarn)
         where t.n >= $3
     """, (area, scat_code, min_street_n, ba_code))
     out = []
     for r in rows:
         t = {"n": r["street_n"], "median": r["street_median"], "spread": r["street_spread"]}
         z, flags = flags_for(r, t)
+        local = local_fields(r, t["spread"], r)
+        if matches_neighbours(r, local, t["spread"]):
+            flags.append("matches_neighbours")
         r["z_score"], r["flags"] = round(z, 2), flags
         p = proposal(r, t) if "zone_a_above_tone" in flags else None
         r["est_saving"] = p["est_saving"] if p else 0
         r["proposal"] = p
+        r.update(local, local_z=round(local["local_z"], 2) if local["local_z"] is not None else None)
         out.append(r)
-    out.sort(key=lambda r: (-len(r["flags"]), -r["est_saving"], -r["z_score"]))
-    flagged = [r for r in out if r["flags"]]
+
+    def problems(r):  # flagged / flagged_only / the sort count the same flags as before matches_neighbours
+        return [f for f in r["flags"] if f not in INFO_FLAGS]
+
+    out.sort(key=lambda r: (-len(problems(r)), -r["est_saving"], -r["z_score"]))
+    flagged = [r for r in out if problems(r)]
     shown = (flagged if flagged_only else out)[:limit]
     if geocode_rows:
         geo = geocode([r["postcode"] for r in shown])
