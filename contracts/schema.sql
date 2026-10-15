@@ -26,6 +26,7 @@ create table if not exists public.scout_runs (
     finished_at timestamptz,
     properties_checked integer not null default 0 check (properties_checked >= 0),
     candidates_flagged integer not null default 0 check (candidates_flagged >= 0),
+    candidates_no_case integer not null default 0 check (candidates_no_case >= 0),
     packs_built integer not null default 0 check (packs_built >= 0),
     packs_killed integer not null default 0 check (packs_killed >= 0),
     config jsonb not null default '{}'::jsonb,
@@ -66,18 +67,31 @@ create table if not exists public.candidates (
     evidence_refs jsonb not null default '[]'::jsonb,
     playbook_version text,
     status text not null default 'flagged'
-        check (status in ('flagged','building_pack','pack_ready','killed','waiting_owner','approved','in_case','dismissed')),
+        check (status in ('flagged','building_pack','packed','pack_ready','no_case','killed','survived','waiting_owner','approved','in_case','dismissed')),
     scored_at timestamptz not null default now(),
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     unique (run_id, uarn, rating_list)
 );
 
+-- Safe to rerun against a project where the earlier draft schema is already applied.
+alter table public.scout_runs
+    add column if not exists candidates_no_case integer not null default 0
+    check (candidates_no_case >= 0);
+
+alter table public.candidates drop constraint if exists candidates_status_check;
+alter table public.candidates add constraint candidates_status_check
+    check (status in ('flagged','building_pack','packed','pack_ready','no_case','killed','survived','waiting_owner','approved','in_case','dismissed'));
+comment on column public.candidates.status is
+    'no_case means no defensible challenge case was found; killed means the advocate rejected a built pack.';
+
+
 -- Immutable versions of builder arguments/calculations. Comparable records must
 -- contain real VOA UARNs and evidence refs returned by the data service.
 create table if not exists public.packs (
     pack_id uuid primary key default gen_random_uuid(),
     case_id uuid not null unique default gen_random_uuid(),
+    case_ref text unique,
     candidate_id uuid not null references public.candidates(candidate_id) on delete restrict,
     pack_version integer not null default 1 check (pack_version > 0),
     uarn text not null,
@@ -85,6 +99,7 @@ create table if not exists public.packs (
     current_rv numeric(14,2) not null check (current_rv >= 0),
     proposed_rv numeric(14,2) not null check (proposed_rv >= 0),
     comparables jsonb not null default '[]'::jsonb,
+    pack jsonb,
     calc jsonb not null default '{}'::jsonb,
     annual_saving numeric(14,2) not null check (annual_saving >= 0),
     argument text not null,
@@ -97,6 +112,14 @@ create table if not exists public.packs (
     unique (candidate_id, pack_version),
     check (proposed_rv <= current_rv)
 );
+
+-- Additive contract fields requested by the cases owner. These ALTERs also
+-- upgrade projects where the earlier packs table is already present.
+alter table public.packs add column if not exists case_ref text unique;
+alter table public.packs add column if not exists pack jsonb;
+comment on column public.packs.case_ref is 'Readable case identifier, for example c_0001; case_id remains the internal UUID.';
+comment on column public.packs.pack is 'Exact validated evidence pack JSON passed to the advocate.';
+
 
 create table if not exists public.verdicts (
     verdict_id uuid primary key default gen_random_uuid(),
@@ -118,7 +141,7 @@ create table if not exists public.cases (
     candidate_id uuid not null references public.candidates(candidate_id) on delete restrict,
     uarn text not null,
     stage text not null default 'waiting_owner' check (stage in (
-        'waiting_owner','check_draft','check_submitted','waiting_check_decision',
+        'waiting_owner','check_ready','check_draft','check_submitted','waiting_check_decision',
         'challenge_draft','challenge_submitted','waiting_challenge_decision',
         'appeal_draft','appeal_submitted','waiting_tribunal','resolved','closed','needs_human')),
     owner_approved boolean not null default false,
@@ -138,6 +161,16 @@ create table if not exists public.cases (
     updated_at timestamptz not null default now(),
     check (not owner_approved or owner_approved_at is not null)
 );
+
+alter table public.cases drop constraint if exists cases_stage_check;
+alter table public.cases add constraint cases_stage_check
+    check (stage in (
+        'waiting_owner','check_ready','check_draft','check_submitted','waiting_check_decision',
+        'challenge_draft','challenge_submitted','waiting_challenge_decision',
+        'appeal_draft','appeal_submitted','waiting_tribunal','resolved','closed','needs_human'));
+comment on column public.verdicts.reasons is
+    'JSON array of advocate reasons; each item has reason, voa_record, and kind fields.';
+
 
 -- Append-only app feed/audit trail. Keep references and concise facts here,
 -- never a republished copy of the VOA data.

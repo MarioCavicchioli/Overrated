@@ -127,7 +127,7 @@ class BuilderHandlers:
             return "ERROR: give a reason"
         if self.store.get_candidate(uarn) is None:
             return f"ERROR: {uarn} is not in candidates"
-        self.store.set_candidate_status(uarn, "dismissed")
+        self.store.set_candidate_status(uarn, "no_case")
         self.store.add_event(AGENT, "no_case", f"{uarn}: {reason}")
         return "Recorded: dropped by builder. Your work on this candidate is done."
 

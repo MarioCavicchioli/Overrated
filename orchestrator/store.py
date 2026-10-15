@@ -32,12 +32,11 @@ ROOT = Path(__file__).resolve().parent.parent
 #
 # candidates.status: flagged (Scout) -> building_pack -> pack_ready (builder) ->
 # waiting_owner (survived the advocate) -> approved (owner) -> in_case.
-# 'dismissed' = dropped by the builder (no usable case), kept apart from
-# 'killed' (killed by the advocate).
-# TODO: switch the builder's drop to 'no_case' once Person 3's p3-app constraint
-# (which adds no_case, defined as "no defensible challenge case was found") is live.
-CANDIDATE_STATUSES = ("flagged", "building_pack", "pack_ready", "killed", "waiting_owner",
-                      "approved", "in_case", "dismissed")
+# 'no_case' = dropped by the builder: no defensible challenge case was found.
+# 'killed' = the advocate rejected a built pack. We write only those words;
+# the live check also allows packed, survived and dismissed.
+CANDIDATE_STATUSES = ("flagged", "building_pack", "packed", "pack_ready", "no_case", "killed",
+                      "survived", "waiting_owner", "approved", "in_case", "dismissed")
 
 # packs.status: built -> reviewing (advocate running) -> survive -> waiting_owner
 # -> approved, or killed. 'superseded' when a newer pack_version replaces it.
@@ -46,7 +45,8 @@ PACK_STATUSES = ("built", "reviewing", "survive", "killed", "waiting_owner", "ap
 
 # cases.stage. waiting_owner until the owner approves with proof of authority,
 # then check_draft, where the Caseworker picks it up to draft the Check.
-CASE_STAGES = ("waiting_owner", "check_draft", "check_submitted", "waiting_check_decision",
+CASE_STAGES = ("waiting_owner", "check_ready", "check_draft", "check_submitted",
+               "waiting_check_decision",
                "challenge_draft", "challenge_submitted", "waiting_challenge_decision",
                "appeal_draft", "appeal_submitted", "waiting_tribunal", "resolved", "closed",
                "needs_human")

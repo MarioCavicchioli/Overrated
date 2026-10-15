@@ -56,9 +56,9 @@ def seed(store, ids):
 def test_candidate_round_trip(env):
     store, ids = env
     seed(store, ids)
-    store.set_candidate_status(ids["uarn"], "dismissed")
+    store.set_candidate_status(ids["uarn"], "no_case")
     c = store.get_candidate(ids["uarn"])
-    assert c["status"] == "dismissed" and c["flags"] == ["zone_a_above_street"]
+    assert c["status"] == "no_case" and c["flags"] == ["zone_a_above_street"]
     with pytest.raises(ValueError):
         store.set_candidate_status(ids["uarn"], "bogus")
 

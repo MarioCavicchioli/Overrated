@@ -17,12 +17,9 @@ from pathlib import Path
 
 SCHEMA = Path(__file__).resolve().parents[1] / "contracts" / "schema.sql"
 
-# Columns agreed with Person 3 but not yet in the live database or schema.sql.
-# The stores use them; remove each one here once it is in schema.sql.
-PENDING = [
-    ("packs", "case_ref", "text", "unique"),   # readable case id, e.g. c_0001 (pack.schema.json)
-    ("packs", "pack", "jsonb", ""),            # the full pack, validated against pack.schema.json
-]
+# Columns agreed with Person 3 but not yet in the live database or schema.sql,
+# as (table, column, type, constraints). Remove each one once it is in schema.sql.
+PENDING: list[tuple[str, str, str, str]] = []
 
 _TYPES = ("double precision", "timestamp with time zone", "timestamptz", "boolean", "integer",
           "bigint", "numeric", "jsonb", "text", "uuid", "date", "int", "bool")

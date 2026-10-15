@@ -190,7 +190,7 @@ def test_no_case_sets_its_own_status(store, data):
     h = BuilderHandlers(store, data)
     assert h.handle("no_case", {"uarn": "1003007", "reason": "No other restaurants."}) \
         .startswith("Recorded")
-    assert store.get_candidate("1003007")["status"] == "dismissed"
+    assert store.get_candidate("1003007")["status"] == "no_case"
 
 
 def test_data_results_are_wrapped_as_data(store, data):
