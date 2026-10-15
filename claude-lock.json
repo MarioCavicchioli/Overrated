@@ -9,9 +9,9 @@
     "./agents/scout/agent.md": {
       "kind": "agent",
       "id": "agent_01AQ3oBbmUhjsWJdm1xv4arK",
-      "version": "2",
-      "hash": "1d4b82f1f5829f40288348f9ab8871bf",
-      "remote_hash": "ac6338be00a71bdedff1170e23b769fe"
+      "version": "3",
+      "hash": "f03ed777a535c0cf2699f1f3f5b17bae",
+      "remote_hash": "95f6ab29f50ffad7d657f871cb341738"
     },
     "./agents/scout/environment.yaml": {
       "kind": "environment",

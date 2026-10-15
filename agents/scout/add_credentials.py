@@ -42,17 +42,21 @@ def main():
         if not value or not url:
             print(f"skip {name}: set {name} and {url_var} in .env first")
             continue
-        cred = client.beta.vaults.credentials.create(
-            vid,
-            display_name=label,
-            auth={
-                "type": "environment_variable",
-                "secret_name": name,
-                "secret_value": value,
-                "networking": {"type": "limited", "allowed_hosts": [urlparse(url).hostname]},
-                "injection_location": {"header": True},
-            },
-        )
+        try:
+            cred = client.beta.vaults.credentials.create(
+                vid,
+                display_name=label,
+                auth={
+                    "type": "environment_variable",
+                    "secret_name": name,
+                    "secret_value": value,
+                    "networking": {"type": "limited", "allowed_hosts": [urlparse(url).hostname]},
+                    "injection_location": {"header": True},
+                },
+            )
+        except anthropic.ConflictError:
+            print(f"skip {name}: already in the vault (archive it in the Console to replace it)")
+            continue
         print(f"added {name} -> {urlparse(url).hostname} ({cred.id})")
 
 
