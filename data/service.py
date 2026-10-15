@@ -260,13 +260,19 @@ def street_tone(street_key: str = "", segment_key: str = "", uarn: int = 0, scat
         t = tone(key, scat_code, year)
         if not t:
             continue
-        shops = q(f"select uarn, address, postcode, rv, zone_a_price, itza from shops_{year} "
+        shops = q(f"select uarn, address, postcode, rv, zone_a_price, itza, desc_text as \"use\" from shops_{year} "
                   "where segment_key = $1 and scat_code = $2 order by zone_a_price desc", (key, scat_code))
         for s in shops:
             s["z_score"] = round((s["zone_a_price"] - t["median"]) / t["spread"], 2)
         segments.append({"segment_key": key, "tone": t, "shops": shops})
     if not segments:
         raise HTTPException(404, "no shops on this street or segment")
+    # map position of every shop (postcode centroid, cached), so a map can plot the segment
+    geo = geocode([s["postcode"] for seg in segments for s in seg["shops"]])
+    for seg in segments:
+        for s in seg["shops"]:
+            ll = geo.get(s["postcode"])
+            s["latitude"], s["longitude"] = (ll[0], ll[1]) if ll else (None, None)
     segments.sort(key=lambda s: -s["tone"]["n"])
     return {"street_key": street_key or segments[0]["segment_key"].split("#")[0], "scat_code": scat_code,
             "year": year, "segments": segments}
