@@ -23,12 +23,12 @@ from typing import Callable
 
 from orchestrator import agent_ports
 from orchestrator.config import env_int
-from orchestrator.store import Store
+from orchestrator.store import CASE_STAGES, FINISHED_STAGES, Store
 
 log = logging.getLogger(__name__)
 AGENT = "orchestrator"
 
-OPEN_STAGES = ("check_ready", "check", "challenge", "tribunal")
+OPEN_STAGES = tuple(s for s in CASE_STAGES if s not in ("waiting_owner", *FINISHED_STAGES))
 DEADLINE_WINDOW = timedelta(days=3)
 WAKE_KIND = {"voa_reply": "caseworker_wake_reply",
              "deadline": "caseworker_wake_deadline",
@@ -101,7 +101,7 @@ class Scheduler:
             if ev["ts"] == self.cursor_ts and ev["id"] in self.cursor_ids:
                 continue
             case = self.store.get_case(ev["case_id"]) if ev.get("case_id") else None
-            if case and case["stage"] not in ("won", "lost", "closed"):
+            if case and case["stage"] not in FINISHED_STAGES:
                 due.setdefault(ev["case_id"], ("voa_reply", "VOA replied",
                                                {"reply_event_id": ev["id"], "reply_ts": ev["ts"]}))
             self.seen_replies.append((ev["ts"], ev["id"]))   # no-wake replies are dealt with too

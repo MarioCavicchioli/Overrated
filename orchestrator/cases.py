@@ -3,7 +3,7 @@
 Approval is the gate before anything is filed. It needs proof of ratepayer
 authority (for now: a rates bill account reference, present and non-empty) and
 the owner's confirmation that the facts are true. Only then does the case move
-to check_ready, where the Caseworker picks it up.
+to check_draft, where the Caseworker picks it up.
 """
 
 from __future__ import annotations
@@ -75,7 +75,9 @@ def approve_case(store: Store, case_id: str, account_reference: str | None,
                 f"reference ({_mask(reference)}). Queued for the Caseworker to file the Check.",
     }]
     store.update_case(case_id, {"owner_approved": True, "owner_approved_at": _now(),
-                                "stage": "check_ready", "history": history})
+                                "stage": "check_draft", "history": history})
+    store.set_pack_status(case_id, "approved")
+    store.set_candidate_status(case["uarn"], "approved")
     store.add_event(AGENT, "owner_approved",
                     "Owner approved with proof of authority; case ready for the Check",
                     case_id=case_id)

@@ -48,7 +48,7 @@ def ensure_pack(store: Store, data: DataClient, pack: dict) -> None:
         store.upsert_candidate({"uarn": pack["uarn"], "address": v["address"],
                                 "postcode": v["postcode"], "street_key": v["street_key"],
                                 "rv": v["rv"], "zone_a_price": v["zone_a_price"],
-                                "status": "packed"})
+                                "status": "pack_ready"})
     store.insert_pack({
         "case_id": pack["case_id"], "uarn": pack["uarn"], "pack": pack,
         "comparables": pack["comparables"], "proposed_rv": pack["proposed_rv"],

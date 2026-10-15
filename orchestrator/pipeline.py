@@ -62,6 +62,7 @@ class Pipeline:
         """Run one advocate session for a pack. Blocking; call from a worker thread."""
         self.store.add_event(AGENT, "advocate_started", "Starting the VOA advocate on this pack",
                              case_id=case_id)
+        self.store.set_pack_status(case_id, "reviewing")
         try:
             self.run_advocate(case_id)
         except Exception as e:
@@ -83,8 +84,10 @@ class Pipeline:
             uarn = pack["uarn"]
             if verdict["verdict"] == "survive":
                 if self.store.get_case(case_id) is None:
+                    self.store.set_pack_status(case_id, "survive")
                     create_case(self.store, case_id, uarn)
-                    self.store.set_candidate_status(uarn, "survived")
+                    self.store.set_pack_status(case_id, "waiting_owner")
+                    self.store.set_candidate_status(uarn, "waiting_owner")
                     self.store.add_event(AGENT, "case_opened",
                                          "Survived the VOA advocate; waiting for the owner",
                                          case_id=case_id)
@@ -93,6 +96,7 @@ class Pipeline:
                 if candidate and candidate["status"] != "killed" \
                         and self.store.get_case(case_id) is None:
                     self.store.set_candidate_status(uarn, "killed")
+                    self.store.set_pack_status(case_id, "killed")
                     self.store.add_event(AGENT, "killed",
                                          "Killed by the VOA advocate: " + _reasons(verdict),
                                          case_id=case_id)

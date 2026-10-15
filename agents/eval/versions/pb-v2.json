@@ -1,0 +1,44 @@
+{
+  "version": "pb-v2",
+  "change": "drop priced runs to the bottom",
+  "rules": {
+    "min_z": 2.0,
+    "min_segment_n": 5,
+    "min_saving": 1000,
+    "threshold_min_z": 1.0,
+    "cluster_size": 3,
+    "cluster_factor": 0.0,
+    "spread_floor": 0.05,
+    "rank_by": "saving"
+  },
+  "train": {
+    "shops": 197182,
+    "hits": 3064,
+    "base_rate": 0.0155,
+    "top50_hits": 8,
+    "top50_rate": 0.16,
+    "same_street_shops": 1158,
+    "same_street_rate": 0.0484,
+    "lift_at_50": 3.309,
+    "candidates": 4833,
+    "candidate_hits": 238,
+    "candidate_precision": 0.0492,
+    "top50_candidates": 50,
+    "lift_at_200": 3.438
+  },
+  "heldout": {
+    "shops": 196966,
+    "hits": 2969,
+    "base_rate": 0.0151,
+    "top50_hits": 6,
+    "top50_rate": 0.12,
+    "same_street_shops": 1008,
+    "same_street_rate": 0.0754,
+    "lift_at_50": 1.592,
+    "candidates": 5031,
+    "candidate_hits": 210,
+    "candidate_precision": 0.0417,
+    "top50_candidates": 50,
+    "lift_at_200": 1.873
+  }
+}

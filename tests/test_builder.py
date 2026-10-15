@@ -154,7 +154,7 @@ def test_schema_errors_reported(data):
 # -- handlers ------------------------------------------------------------
 def seed(store, data, uarn):
     v = data.get_valuation(uarn)
-    store.upsert_candidate({"uarn": uarn, "address": v["address"], "status": "building"})
+    store.upsert_candidate({"uarn": uarn, "address": v["address"], "status": "building_pack"})
 
 
 def test_submit_writes_pack_pdf_and_events(store, data):
@@ -169,7 +169,7 @@ def test_submit_writes_pack_pdf_and_events(store, data):
     assert row["pack"]["case_id"] == "c_0001" and row["version"] == "builder-v1"
     assert row["annual_saving"] == row["pack"]["annual_saving"] == expected_saving
     assert Path(row["pdf_url"].removeprefix("file:///")).exists()
-    assert store.get_candidate("1001008")["status"] == "packed"
+    assert store.get_candidate("1001008")["status"] == "pack_ready"
     assert [e["kind"] for e in store.list_events()] == ["pack_written"]
 
 
@@ -182,7 +182,7 @@ def test_rejected_pack_writes_nothing(store, data):
         assert h.handle("submit_pack", args).startswith("REJECTED.")
     assert "no attempts left" in h.handle("submit_pack", args)
     assert store.get_pack("c_0001") is None
-    assert store.get_candidate("1001008")["status"] == "building"
+    assert store.get_candidate("1001008")["status"] == "building_pack"
 
 
 def test_no_case_sets_its_own_status(store, data):
@@ -190,7 +190,7 @@ def test_no_case_sets_its_own_status(store, data):
     h = BuilderHandlers(store, data)
     assert h.handle("no_case", {"uarn": "1003007", "reason": "No other restaurants."}) \
         .startswith("Recorded")
-    assert store.get_candidate("1003007")["status"] == "no_case"
+    assert store.get_candidate("1003007")["status"] == "dismissed"
 
 
 def test_data_results_are_wrapped_as_data(store, data):
@@ -203,9 +203,9 @@ def test_data_results_are_wrapped_as_data(store, data):
 def test_sqlite_schema_matches_contract(store):
     """The local SQLite tables are built from contracts/schema.sql, PENDING columns included."""
     from orchestrator import contract
-    expected = {t: [c.name for c in cols] for t, cols in contract.tables().items()}
-    sql = (ROOT / "contracts" / "schema.sql").read_text()
-    assert set(expected) == set(re.findall(r"create table if not exists (\w+)", sql))
+    expected = {t: [c.name for c in tbl.columns] for t, tbl in contract.tables().items()}
+    sql = (ROOT / "contracts" / "schema.sql").read_text(encoding="utf-8")
+    assert set(expected) == set(re.findall(r"create table if not exists (?:public\.)?(\w+)", sql))
     assert "case_ref" in expected["packs"] and "pack" in expected["packs"]
     local = {t: [r[1] for r in store.db.execute(f"pragma table_info({t})")] for t in expected}
     assert local == expected

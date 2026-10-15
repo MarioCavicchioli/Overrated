@@ -28,14 +28,29 @@ from orchestrator import contract
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# candidates.status. 'flagged' is the Scout's starting value (the live default).
-# 'no_case' = dropped by the builder, kept apart from 'killed' (killed by the advocate).
-CANDIDATE_STATUSES = ("flagged", "new", "building", "packed", "no_case", "killed", "survived")
+# The allowed values are the live check constraints in contracts/schema.sql.
+#
+# candidates.status: flagged (Scout) -> building_pack -> pack_ready (builder) ->
+# waiting_owner (survived the advocate) -> approved (owner) -> in_case.
+# 'dismissed' = dropped by the builder (no usable case), kept apart from
+# 'killed' (killed by the advocate).
+# TODO: switch the builder's drop to 'no_case' once Person 3's p3-app constraint
+# (which adds no_case, defined as "no defensible challenge case was found") is live.
+CANDIDATE_STATUSES = ("flagged", "building_pack", "pack_ready", "killed", "waiting_owner",
+                      "approved", "in_case", "dismissed")
 
-# cases.stage. 'waiting_owner' is the live default. 'check_ready' = owner approved
-# with proof of authority; the Caseworker picks these up to file the Check.
-CASE_STAGES = ("waiting_owner", "check_ready", "check", "challenge", "tribunal",
-               "won", "lost", "closed")
+# packs.status: built -> reviewing (advocate running) -> survive -> waiting_owner
+# -> approved, or killed. 'superseded' when a newer pack_version replaces it.
+PACK_STATUSES = ("built", "reviewing", "survive", "killed", "waiting_owner", "approved",
+                 "superseded")
+
+# cases.stage. waiting_owner until the owner approves with proof of authority,
+# then check_draft, where the Caseworker picks it up to draft the Check.
+CASE_STAGES = ("waiting_owner", "check_draft", "check_submitted", "waiting_check_decision",
+               "challenge_draft", "challenge_submitted", "waiting_challenge_decision",
+               "appeal_draft", "appeal_submitted", "waiting_tribunal", "resolved", "closed",
+               "needs_human")
+FINISHED_STAGES = ("resolved", "closed")
 
 CASE_UPDATABLE = {"stage", "next_deadline", "next_action", "owner_approved",
                   "owner_approved_at", "history"}
@@ -73,6 +88,7 @@ class Store(Protocol):
     def next_case_id(self) -> str: ...
     def insert_pack(self, row: dict[str, Any]) -> None: ...
     def get_pack(self, case_id: str) -> dict[str, Any] | None: ...
+    def set_pack_status(self, case_id: str, status: str) -> None: ...
     def list_case_ids(self) -> list[str]: ...
     def save_pdf(self, case_id: str, data: bytes) -> str: ...
     def insert_verdict(self, row: dict[str, Any]) -> None: ...
@@ -218,6 +234,14 @@ class BaseStore:
         return {**row, "case_uuid": row["case_id"], "case_id": row["case_ref"],
                 "version": row["builder_version"]}
 
+    def set_pack_status(self, case_id: str, status: str) -> None:
+        if status not in PACK_STATUSES:
+            raise ValueError(f"unknown pack status {status!r}")
+        keys = self._keys(case_id)
+        if keys["pack_id"] is None:
+            raise ValueError(f"no pack {case_id}")
+        self._update("packs", {"status": status}, [("pack_id", "eq", keys["pack_id"])])
+
     def list_case_ids(self) -> list[str]:
         rows = self._select("packs", order=[("created_at", False)])
         return [r["case_ref"] for r in rows if r.get("case_ref")]
@@ -359,7 +383,7 @@ class SQLiteStore(BaseStore):
         self.db.executescript(contract.sqlite_ddl())
         # One connection shared by the watcher and the agents' worker threads.
         self.lock = threading.RLock()
-        self.columns = {t: [c.name for c in cols] for t, cols in contract.tables().items()}
+        self.columns = {t: [c.name for c in tbl.columns] for t, tbl in contract.tables().items()}
 
     def _check(self, table: str, cols) -> None:
         # Table and column names are checked against the contract; values are always bound.

@@ -1,0 +1,11 @@
+# Scout sandbox. Limited egress: only the data service tunnel and the Supabase project.
+# Any Supabase project; the vault credential itself is limited to our project host.
+name: overrated-scout
+config:
+  type: cloud
+  networking:
+    type: limited
+    allow_package_managers: false
+    allowed_hosts:
+      - undrilled-important-sputter.ngrok-free.dev
+      - "*.supabase.co"

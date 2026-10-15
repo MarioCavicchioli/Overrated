@@ -22,7 +22,8 @@ def store(tmp_path) -> SQLiteStore:
 
 
 def add_pack(store, case_id="c_0001", uarn="1001008"):
-    store.upsert_candidate({"uarn": uarn, "address": "137 Mare Street", "status": "packed"})
+    store.upsert_candidate({"uarn": uarn, "address": "137 Mare Street", "rv": 30000,
+                            "status": "pack_ready"})
     pack = {"case_id": case_id, "uarn": uarn}
     store.insert_pack({"case_id": case_id, "uarn": uarn, "pack": pack, "comparables": [],
                        "proposed_rv": 1, "annual_saving": 1, "argument": "x" * 50,
@@ -51,7 +52,7 @@ def test_new_pack_starts_advocate_and_survive_opens_case(store):
     case = store.get_case("c_0001")
     assert case["stage"] == "waiting_owner" and case["owner_approved"] is False
     assert {"type": "risk", "text": RISK_LINE}.items() <= case["history"][1].items()
-    assert store.get_candidate("1001008")["status"] == "survived"
+    assert store.get_candidate("1001008")["status"] == "waiting_owner"
     assert "case_opened" in kinds(store)
     p.apply_verdicts()   # idempotent
     assert kinds(store).count("case_opened") == 1
@@ -131,14 +132,14 @@ def test_approve_requires_authority_and_confirmation(api, store):
     assert store.get_case("c_0001")["stage"] == "waiting_owner"
 
 
-def test_approve_moves_case_to_check_ready(api, store):
+def test_approve_moves_case_to_check_draft(api, store):
     add_pack(store)
     create_case(store, "c_0001", "1001008")
     r = api.post("/cases/c_0001/approve", headers=AUTH,
                  json={"account_reference": "4471-2290-11", "facts_confirmed": True})
     assert r.status_code == 200
     body = r.json()
-    assert body["owner_approved"] is True and body["stage"] == "check_ready"
+    assert body["owner_approved"] is True and body["stage"] == "check_draft"
     assert body["risk"] == RISK_LINE
     assert "4471-2290-11" not in str(body) and "ending 0-11" in str(body)
     assert "4471-2290-11" not in str(store.list_events())

@@ -100,7 +100,7 @@ class BuilderHandlers:
             "annual_saving": pack["annual_saving"], "argument": pack["argument"],
             "pdf_url": pdf_url, "version": VERSION,
         })
-        self.store.set_candidate_status(uarn, "packed")
+        self.store.set_candidate_status(uarn, "pack_ready")
         self.store.add_event(
             AGENT, "pack_written",
             f"{pack['address']}: £{pack['current_rv']:,} -> £{pack['proposed_rv']:,}, "
@@ -127,7 +127,7 @@ class BuilderHandlers:
             return "ERROR: give a reason"
         if self.store.get_candidate(uarn) is None:
             return f"ERROR: {uarn} is not in candidates"
-        self.store.set_candidate_status(uarn, "no_case")
+        self.store.set_candidate_status(uarn, "dismissed")
         self.store.add_event(AGENT, "no_case", f"{uarn}: {reason}")
         return "Recorded: dropped by builder. Your work on this candidate is done."
 

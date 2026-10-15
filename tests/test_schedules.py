@@ -18,15 +18,16 @@ def store(tmp_path):
     return SQLiteStore(tmp_path / "t.db", tmp_path / "pdfs")
 
 
-def open_case(store, case_id, stage="check", deadline=None):
+def open_case(store, case_id, stage="check_draft", deadline=None):
     uarn = f"U{case_id}"
-    store.upsert_candidate({"uarn": uarn, "address": "a", "status": "survived"})
+    store.upsert_candidate({"uarn": uarn, "address": "a", "rv": 30000, "status": "waiting_owner"})
     store.insert_pack({"case_id": case_id, "uarn": uarn, "pack": {}, "comparables": [],
                        "proposed_rv": 1, "annual_saving": 1, "argument": "x" * 50,
                        "version": "t"})
+    approved = stage != "waiting_owner"
     store.insert_case({"case_id": case_id, "uarn": uarn, "stage": stage,
-                       "owner_approved": stage != "waiting_owner", "history": [],
-                       "next_deadline": deadline})
+                       "owner_approved": approved, "history": [], "next_deadline": deadline,
+                       "owner_approved_at": NOON.isoformat() if approved else None})
 
 
 def sched(store, clock, calls, nightly_hour=24, **kw):
@@ -92,7 +93,7 @@ def test_deadline_within_three_days_wakes_once_a_day(store):
 def test_daily_sweep_wakes_open_cases_once(store):
     open_case(store, "c_0001")
     open_case(store, "c_0002", stage="waiting_owner")   # not approved: not swept
-    open_case(store, "c_0003", stage="won")
+    open_case(store, "c_0003", stage="resolved")
     clock, calls = [NOON.replace(hour=6)], []
     s = sched(store, clock, calls)
     run(s.tick())

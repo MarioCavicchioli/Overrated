@@ -1,38 +1,28 @@
-"""Generate contracts/schema.sql from the live Supabase database. Read-only.
+"""Check contracts/schema.sql against the live Supabase database. Read-only.
 
-    python -m contracts.schema_from_live            # writes contracts/schema.sql
-    python -m contracts.schema_from_live --check    # exit 1 if schema.sql differs from live
+    python -m contracts.schema_from_live          # exit 1 if any column or type differs
+
+contracts/schema.sql is Person 3's DDL for the live database. This never writes
+it; it reports drift between the file and the live columns and types.
 
 information_schema isn't exposed through PostgREST (only public and
-graphql_public are), so this reads PostgREST's OpenAPI description of the
-public schema, which comes from the same catalog. It shows column types, NOT
-NULL, defaults, primary keys and foreign keys. It cannot show check or unique
-constraints, indexes, RLS policies or the realtime publication; the header of
-the generated file says so.
+graphql_public are), so the live side comes from PostgREST's OpenAPI
+description of the public schema. That shows columns, types, NOT NULL,
+defaults and keys, but not check or unique constraints, indexes, RLS or the
+realtime publication, so those aren't compared.
 """
 
 from __future__ import annotations
 
 import os
-import re
 import sys
-from pathlib import Path
 
 import httpx
 
+from orchestrator import contract
 from orchestrator.config import load_env, supabase_url
 
-OUT = Path(__file__).with_name("schema.sql")
-TABLE_ORDER = ["scout_runs", "candidates", "packs", "verdicts", "cases", "events",
-               "eval_runs", "playbook"]
-TYPE = {"int32": "integer", "int64": "bigint", "timestamp with time zone": "timestamptz"}
-
-# Columns agreed with person 3 but not yet in the live database. Kept here so the
-# contract and the local SQLite copy have them; remove each once it is live.
-PENDING = [
-    ("packs", "case_ref", "text", "readable case id, e.g. c_0001 (pack.schema.json case_id)"),
-    ("packs", "pack", "jsonb", "the full pack, validated against pack.schema.json"),
-]
+LIVE_TYPE = {"int32": "integer", "int64": "bigint", "timestamp with time zone": "timestamptz"}
 
 
 def fetch_spec() -> dict:
@@ -44,82 +34,49 @@ def fetch_spec() -> dict:
     return r.json()
 
 
-def _default(value, sql_type: str) -> str:
-    text = str(value)
-    if "(" in text or sql_type not in ("text",):
-        return {"True": "true", "False": "false"}.get(text, text)
-    return "'" + text.replace("'", "''") + "'"
+def live_columns(spec: dict) -> dict[str, dict[str, str]]:
+    return {t: {c: LIVE_TYPE.get(p.get("format"), p.get("format") or p.get("type"))
+                for c, p in d["properties"].items()}
+            for t, d in spec["definitions"].items()}
 
 
-def render(spec: dict) -> str:
-    defs = spec["definitions"]
-    referenced: set[tuple[str, str]] = set()
-    for d in defs.values():
-        for p in d["properties"].values():
-            m = re.search(r"<fk table='(\w+)' column='(\w+)'", p.get("description") or "")
-            if m:
-                referenced.add((m.group(1), m.group(2)))
-
-    lines = [
-        "-- Overrated: Supabase schema, GENERATED from the live database by",
-        "-- contracts/schema_from_live.py (read-only). The live database is the source of truth;",
-        "-- person 3 owns it. Do not edit by hand: change the database, then regenerate.",
-        "--",
-        "-- Read through PostgREST's OpenAPI description (information_schema isn't exposed).",
-        "-- Shown: types, NOT NULL, defaults, primary and foreign keys.",
-        "-- Not visible from there, so NOT in this file: check constraints (allowed status",
-        "-- and stage values), unique constraints other than those implied by foreign keys,",
-        "-- indexes, RLS policies, and the realtime publication.",
-        "",
-    ]
-    names = [t for t in TABLE_ORDER if t in defs] + sorted(set(defs) - set(TABLE_ORDER))
-    for table in names:
-        props, required = defs[table]["properties"], set(defs[table].get("required", []))
-        cols: list[tuple[str, str]] = []
-        for col, p in props.items():
-            sql_type = TYPE.get(p.get("format"), p.get("format") or p.get("type"))
-            parts, note = [f"  {col:<24}", sql_type], ""
-            if col in required:
-                parts.append("not null")
-            if "default" in p:
-                parts.append(f"default {_default(p['default'], sql_type)}")
-            desc = p.get("description") or ""
-            if "<pk/>" in desc:
-                parts.append("primary key")
-            elif (table, col) in referenced:
-                parts.append("unique")
-                note = "  -- implied: referenced by a foreign key"
-            m = re.search(r"<fk table='(\w+)' column='(\w+)'", desc)
-            if m:
-                parts.append(f"references {m.group(1)}({m.group(2)})")
-            cols.append((" ".join(parts), note))
-        lines.append(f"create table if not exists {table} (")
-        for i, (sql, note) in enumerate(cols):
-            lines.append(sql + ("," if i < len(cols) - 1 else "") + note)
-        lines.append(");")
-        lines.append("")
-
-    lines.append("-- PENDING: agreed, not yet live (person 3 is adding them).")
-    for table, col, sql_type, note in PENDING:
-        live = col in defs.get(table, {}).get("properties", {})
-        prefix = "-- now live, drop from PENDING: " if live else ""
-        lines.append(f"{prefix}alter table {table} add column if not exists {col} {sql_type};"
-                     f"  -- {note}")
-    lines.append("")
-    return "\n".join(lines)
+def differences(spec: dict) -> tuple[list[str], list[str]]:
+    """(drift, pending): drift = file vs live; pending = agreed columns not yet live."""
+    live = live_columns(spec)
+    pending_cols = {(t, c) for t, c, _, _ in contract.PENDING}
+    file = {t: {c.name: c.type for c in tbl.columns if (t, c.name) not in pending_cols}
+            for t, tbl in contract.tables().items()}
+    drift, pending = [], []
+    for t in sorted(set(live) | set(file)):
+        if t not in file:
+            drift.append(f"table {t}: live, missing from schema.sql")
+        elif t not in live:
+            drift.append(f"table {t}: in schema.sql, not live")
+        else:
+            for c in sorted(set(live[t]) | set(file[t])):
+                a, b = file[t].get(c), live[t].get(c)
+                if a is None:
+                    drift.append(f"{t}.{c}: live ({b}), missing from schema.sql")
+                elif b is None:
+                    drift.append(f"{t}.{c}: in schema.sql ({a}), not live")
+                elif a != b:
+                    drift.append(f"{t}.{c}: schema.sql {a}, live {b}")
+    for t, c, _, _ in contract.PENDING:
+        state = "now live: add it to schema.sql and drop it from PENDING" \
+            if c in live.get(t, {}) else "not live yet"
+        pending.append(f"{t}.{c}: {state}")
+    return drift, pending
 
 
-def main(argv: list[str]) -> int:
-    text = render(fetch_spec())
-    if "--check" in argv:
-        same = OUT.exists() and OUT.read_text(encoding="utf-8") == text
-        print("schema.sql matches the live database" if same else
-              "schema.sql differs from the live database: regenerate it")
-        return 0 if same else 1
-    OUT.write_text(text, encoding="utf-8")
-    print(f"wrote {OUT}")
-    return 0
+def main() -> int:
+    drift, pending = differences(fetch_spec())
+    for line in drift:
+        print("DRIFT  ", line)
+    for line in pending:
+        print("PENDING", line)
+    print("schema.sql matches the live database" if not drift else f"{len(drift)} difference(s)")
+    return 1 if drift else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())

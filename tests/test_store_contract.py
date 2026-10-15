@@ -45,7 +45,7 @@ def env(request, tmp_path):
 
 
 def seed(store, ids):
-    store.upsert_candidate({"uarn": ids["uarn"], "address": "TEST address", "status": "packed",
+    store.upsert_candidate({"uarn": ids["uarn"], "address": "TEST address", "rv": 30000, "status": "pack_ready",
                             "flags": ["zone_a_above_street"]})
     store.insert_pack({"case_id": ids["case_id"], "uarn": ids["uarn"],
                        "pack": {"case_id": ids["case_id"]}, "comparables": [],
@@ -56,9 +56,9 @@ def seed(store, ids):
 def test_candidate_round_trip(env):
     store, ids = env
     seed(store, ids)
-    store.set_candidate_status(ids["uarn"], "no_case")
+    store.set_candidate_status(ids["uarn"], "dismissed")
     c = store.get_candidate(ids["uarn"])
-    assert c["status"] == "no_case" and c["flags"] == ["zone_a_above_street"]
+    assert c["status"] == "dismissed" and c["flags"] == ["zone_a_above_street"]
     with pytest.raises(ValueError):
         store.set_candidate_status(ids["uarn"], "bogus")
 
@@ -70,20 +70,26 @@ def test_pack_verdict_case_round_trip(env):
     assert store.get_pack(cid)["pack"] == {"case_id": cid}
     assert cid in store.list_case_ids()
     assert store.latest_verdict(cid) is None
-    store.insert_verdict({"case_id": cid, "verdict": "kill", "version": "t",
+    # Live: one verdict per (pack, advocate_version), so a rerun needs a new version.
+    store.insert_verdict({"case_id": cid, "verdict": "kill", "version": "t1",
                           "reasons": [{"reason": "a", "voa_record": "1"}]})
-    store.insert_verdict({"case_id": cid, "verdict": "survive", "version": "t",
+    with pytest.raises(Exception):
+        store.insert_verdict({"case_id": cid, "verdict": "survive", "version": "t1",
+                              "reasons": [{"reason": "b", "voa_record": "2"}]})
+    store.insert_verdict({"case_id": cid, "verdict": "survive", "version": "t2",
                           "reasons": [{"reason": "b", "voa_record": "2"}]})
     assert store.latest_verdict(cid)["verdict"] == "survive"
+    assert [v["version"] for v in store.list_verdicts(cid)] == ["t1", "t2"]
 
     store.insert_case({"case_id": cid, "uarn": ids["uarn"], "stage": "waiting_owner",
                        "owner_approved": False, "history": [{"type": "risk", "text": "r"}]})
-    store.update_case(cid, {"stage": "check_ready", "owner_approved": True,
+    store.update_case(cid, {"stage": "check_draft", "owner_approved": True,
+                            "owner_approved_at": "2026-10-15T12:00:00+00:00",
                             "next_deadline": "2026-10-20T09:00:00+00:00"})
     case = store.get_case(cid)
-    assert case["stage"] == "check_ready" and case["owner_approved"] is True
+    assert case["stage"] == "check_draft" and case["owner_approved"] is True
     assert case["history"] == [{"type": "risk", "text": "r"}]
-    assert cid in [c["case_id"] for c in store.list_cases(("check_ready",))]
+    assert cid in [c["case_id"] for c in store.list_cases(("check_draft",))]
     with pytest.raises(ValueError):
         store.update_case(cid, {"uarn": "x"})
 
