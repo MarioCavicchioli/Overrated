@@ -2,7 +2,7 @@
 
 Owner: person 1. DuckDB + Parquet over VOA files. Tools: search_properties, get_valuation, comparables, street_tone, historic_values (eval only), plus scan (Scout helper).
 
-Raw files go in data/raw/ (gitignored). Parquet goes in data/parquet/ (gitignored).
+Raw files go in data/raw/ (gitignored). Parquet goes in data/parquet/ (gitignored). Tables: `*_2026` (2026 list, epoch 0004), `*_2023` (2023 list now, epoch 0023), `*_2023a` (2023 list as compiled on 30 Mar 2023, epoch 0001; eval backtest input only).
 
 ## Run
 

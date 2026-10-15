@@ -1,6 +1,6 @@
 """Build Parquet tables from the raw VOA files in data/raw.
 
-Run: .venv/bin/python data/build.py
+Run: .venv/bin/python data/build.py [2026 2023 2023a]
 Writes data/parquet/*.parquet (gitignored). Takes a few minutes.
 
 Raw files are asterisk-delimited with no header. Summary valuations mix record
@@ -10,6 +10,7 @@ each 02 row with the UARN of the 01 row above it before loading.
 import glob
 import os
 import subprocess
+import sys
 
 import duckdb
 
@@ -17,6 +18,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(HERE, "raw")
 WORK = os.path.join(RAW, "_work")
 OUT = os.path.join(HERE, "parquet")
+
+# (table suffix, list year, epoch). 2023a is the 2023 list as compiled on 30 Mar 2023, before any
+# later change: the eval backtest scores it and checks the answers against 2023 (epoch 0023).
+DATASETS = [("2026", "2026", "0004"), ("2023", "2023", "0023"), ("2023a", "2023", "0001")]
 
 LIST_COLS = [
     "entry_no", "ba_code", "community_code", "ba_ref", "desc_code", "desc_text",
@@ -85,10 +90,13 @@ def main():
         create macro num(s) as try_cast(nullif(trim(s), '') as double);
     """)
 
-    for year, epoch in (("2026", "0004"), ("2023", "0023")):
-        le = one(f"*{year}-listentries*/*baseline-csv.csv")
-        hist = one(f"*{year}-listentries*/*historic-csv.csv")
-        sv = one(f"*{year}-summaryvaluations*/*.csv")
+    only = set(sys.argv[1:])  # e.g. `build.py 2023a` rebuilds just that dataset
+    for year, list_year, epoch in DATASETS:
+        if only and year not in only:
+            continue
+        le = one(f"*{list_year}-listentries-compiled-epoch-{epoch}-baseline-csv/*baseline-csv.csv")
+        hist = glob.glob(os.path.join(RAW, f"*{list_year}-listentries-compiled-epoch-{epoch}-baseline-csv/*historic-csv.csv"))
+        sv = one(f"*{list_year}-summaryvaluations-compiled-epoch-{epoch}-baseline-csv/*.csv")
         heads, lines = split_sv(sv, year)
         print(f"[{year}] loading list entries")
 
@@ -107,7 +115,8 @@ def main():
             ) to '{OUT}/list_{year}.parquet' (format parquet)
         """)
 
-        con.execute(f"""
+        if hist:  # epoch 0001 of a list has no historic entries yet
+          con.execute(f"""
             copy (
               select ba_code, ba_ref, desc_code, desc_text, uarn::bigint as uarn,
                      try_strptime(effective_date, '%d-%b-%Y')::date as effective_date,
@@ -115,7 +124,7 @@ def main():
                      left(scat, 3) as scat_code,
                      try_strptime(from_date, '%d-%b-%Y')::date as from_date,
                      try_strptime(to_date, '%d-%b-%Y')::date as to_date
-              from {read_csv(hist, HIST_COLS)}
+              from {read_csv(hist[0], HIST_COLS)}
               where try_cast(uarn as bigint) is not null
             ) to '{OUT}/historic_{year}.parquet' (format parquet)
         """)
