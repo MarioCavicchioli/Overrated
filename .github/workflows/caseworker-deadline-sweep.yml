@@ -1,0 +1,37 @@
+name: Caseworker Deadline Sweep
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: Maximum number of due cases to process
+        required: false
+        default: "100"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: caseworker-deadline-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -r agents/caseworker/requirements.txt
+      - run: python -m orchestrator.caseworker_dispatch --deadlines-once --limit "$LIMIT"
+        env:
+          LIMIT: ${{ inputs.limit || '100' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CASEWORKER_AGENT_ID: ${{ secrets.CASEWORKER_AGENT_ID }}
+          MANAGED_AGENT_ENVIRONMENT_ID: ${{ secrets.MANAGED_AGENT_ENVIRONMENT_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
