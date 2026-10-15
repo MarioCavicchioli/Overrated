@@ -211,11 +211,15 @@ class BaseStore:
         return bool(self._select("packs", [("uarn", "eq", uarn)], limit=1))
 
     # -- packs -----------------------------------------------------------------
+    # Our case refs start here. Live: c_0101, because Person 1's app uses c_0001-c_0008.
+    CASE_REF_START = 1
+
     def next_case_id(self) -> str:
-        n = 0
+        start = int(os.getenv("CASE_REF_START") or self.CASE_REF_START)
+        n = start - 1
         for row in self._select("packs"):
             ref = row.get("case_ref") or ""
-            if ref.startswith("c_") and ref[2:].isdigit():
+            if ref.startswith("c_") and ref[2:].isdigit() and int(ref[2:]) >= start:
                 n = max(n, int(ref[2:]))
         return f"c_{n + 1:04d}"
 

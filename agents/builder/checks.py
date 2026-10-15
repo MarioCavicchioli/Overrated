@@ -26,6 +26,7 @@ MAX_COMPARABLES = 6
 EXCLUDE_BEYOND_SPREADS = 2.0                 # an eligible comparable may be left out only past this
 MAX_EXCLUSIONS = 1                           # and at most one: a block priced like the subject
                                              # (e.g. 221-233 Old Street) can't be excluded away
+SUBJECT_TWIN_SPREADS = 1.0                   # never one within this of the subject's own price
 PRICE_TOL = 0.5                              # GBP/m2, for rounding
 DISTANCE_TOL_M = 0.5
 
@@ -61,10 +62,15 @@ def eligible_comparables(uarn: str, data: DataClient) -> list[dict]:
     street segment within COMP_MAX_DISTANCE_M, with floor area between half and
     double the subject's, nearest first, at most MAX_COMPARABLES.
 
-    Each entry carries spreads_from_median and whether it may be excluded.
+    Each entry carries spreads_from_median, spreads_from_subject and whether it
+    may be excluded: only when it is more than EXCLUDE_BEYOND_SPREADS from the
+    street median AND more than SUBJECT_TWIN_SPREADS from the subject's own price.
+    A neighbour priced like the subject is the best evidence of how the VOA prices
+    that spot, so it is never left out.
     """
     subject = data.get_valuation(uarn)
     tone = data.street_tone(subject["street_key"])
+    spread = tone["spread"] or 1
     out = []
     for c in data.comparables(uarn, max_distance=COMP_MAX_DISTANCE_M, same_use=True, limit=200):
         record = data.get_valuation(c["uarn"])
@@ -72,11 +78,14 @@ def eligible_comparables(uarn: str, data: DataClient) -> list[dict]:
         if not SIZE_RATIO_MIN <= ratio <= SIZE_RATIO_MAX:
             continue
         spreads = spreads_from_median(c["zone_a_price"], tone)
+        from_subject = (c["zone_a_price"] - subject["zone_a_price"]) / spread
         out.append({"uarn": c["uarn"], "zone_a_price": c["zone_a_price"],
                     "distance_m": c["distance_m"], "use": c["use"],
                     "floor_area_ratio": round(ratio, 2),
                     "spreads_from_median": round(spreads, 2),
-                    "may_exclude": abs(spreads) > EXCLUDE_BEYOND_SPREADS})
+                    "spreads_from_subject": round(from_subject, 2),
+                    "may_exclude": abs(spreads) > EXCLUDE_BEYOND_SPREADS
+                    and abs(from_subject) > SUBJECT_TWIN_SPREADS})
         if len(out) == MAX_COMPARABLES:
             break
     return out
@@ -173,8 +182,14 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
             errors.append(f"{tag}: not an eligible comparable, so it needs no exclusion")
             continue
         if not e["may_exclude"]:
-            errors.append(f"{tag}: is {e['spreads_from_median']} spreads from the street median; "
-                          f"only beyond {EXCLUDE_BEYOND_SPREADS:g} may be excluded, so use it")
+            if abs(e["spreads_from_median"]) <= EXCLUDE_BEYOND_SPREADS:
+                errors.append(f"{tag}: is {e['spreads_from_median']} spreads from the street "
+                              f"median; only beyond {EXCLUDE_BEYOND_SPREADS:g} may be excluded, "
+                              "so use it")
+            else:
+                errors.append(f"{tag}: is within {SUBJECT_TWIN_SPREADS:g} spread of the "
+                              f"candidate's own price ({e['spreads_from_subject']} spreads); a "
+                              "neighbour priced like the candidate can never be excluded, so use it")
         if abs(ex["zone_a_price"] - e["zone_a_price"]) > PRICE_TOL:
             errors.append(f"{tag}: zone_a_price should be {e['zone_a_price']}")
         if abs(ex["distance_m"] - e["distance_m"]) > DISTANCE_TOL_M:

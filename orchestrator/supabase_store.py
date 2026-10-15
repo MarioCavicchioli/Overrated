@@ -25,6 +25,8 @@ PDF_BUCKET = "packs"
 
 
 class SupabaseStore(BaseStore):
+    CASE_REF_START = 101   # c_0001-c_0008 are Person 1's app's refs
+
     def __init__(self, client: Client | None = None):
         super().__init__()
         if client is None:

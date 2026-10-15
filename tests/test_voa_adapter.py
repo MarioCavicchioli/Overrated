@@ -91,7 +91,10 @@ BLOCK_NEIGHBOURS = ["900000102", "900000103", "900000104", "900000105"]   # all 
 def test_old_street_block_neighbours_are_the_eligible_set(voa):
     eligible = eligible_comparables(BLOCK_SUBJECT, voa)
     assert [c["uarn"] for c in eligible][:4] == BLOCK_NEIGHBOURS
-    assert all(c["may_exclude"] for c in eligible[:4])     # each ~2 spreads above the segment
+    for c in eligible[:4]:
+        assert c["spreads_from_median"] > 2          # far above the segment...
+        assert c["spreads_from_subject"] == 0        # ...but priced exactly like the subject
+        assert not c["may_exclude"]
 
 
 def test_old_street_block_cannot_be_excluded_away(voa):
@@ -101,11 +104,15 @@ def test_old_street_block_cannot_be_excluded_away(voa):
     assert any("at most 1 eligible comparable" in e for e in errors)
 
 
-def test_old_street_block_has_no_case_within_the_rule(voa):
-    """With the one exclusion allowed, the median is still the block's price: no reduction."""
+def test_neighbour_priced_like_the_subject_is_never_excluded(voa):
+    """Seven Sisters Road c_0001: the builder left out its twin at 0 m and the same price.
+    Even one such exclusion is rejected, and with the twin kept there's no reduction."""
     pack = build_pack(voa, BLOCK_SUBJECT, exclude=(BLOCK_NEIGHBOURS[0],))
-    assert pack["proposed_rv"] >= pack["current_rv"]
-    assert any("proposed_rv must be below current_rv" in e for e in check_pack(pack, voa))
+    errors = check_pack(pack, voa)
+    assert any("priced like the candidate can never be excluded" in e for e in errors)
+    honest = build_pack(voa, BLOCK_SUBJECT)
+    assert honest["proposed_rv"] >= honest["current_rv"]
+    assert any("proposed_rv must be below current_rv" in e for e in check_pack(honest, voa))
 
 
 def test_unknown_uarn_and_bad_key(voa):
