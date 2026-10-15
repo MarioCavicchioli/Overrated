@@ -12,7 +12,7 @@ Owner: person 1. Lead agent (multiagent coordinator). Sweeps a borough street by
 
 ## Set up (once)
 
-1. Fill `YOUR_PROJECT` in `environment.yaml` from SUPABASE_URL.
+1. Sign in once with `ant auth login` (team org, Claude Code workspace). The scripts and `ant` use that profile; leave ANTHROPIC_API_KEY unset.
 2. From the repo root:
 
 ```
@@ -21,7 +21,9 @@ ant apply agents/scout/agent.md agents/scout/environment.yaml agents/scout/vault
 .venv/bin/python agents/scout/add_credentials.py
 ```
 
-3. Commit `claude-lock.json`.
+3. Commit `claude-lock.json`. Re-run `add_credentials.py` after adding Supabase to .env.
+
+Deployed 15 Oct in team63728 / Claude Code: agent, environment and vault IDs are in `claude-lock.json`.
 
 When Person 2's Case builder exists, add `../builder/agent.md` to the roster in `agent.md` and run `ant apply` again.
 
