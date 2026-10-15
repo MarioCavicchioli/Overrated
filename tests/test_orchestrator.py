@@ -203,9 +203,9 @@ def test_run_session_answers_tools_denies_asks_and_logs_spend(store):
         NS(type="never.reached"),
     ]
     client = FakeClient(events, usage)
-    result = run_session(client, store, agent="agent_x", environment_id="env_x",
-                         model="claude-sonnet-5-5", agent_name="scout", kickoff="go",
-                         tool_handler=lambda name, args: f"result for {args['uarn']}")
+    result = run_session(client, store, agent="scout", agent_id="agent_x", environment_id="env_x",
+                         title="scout test", model="claude-sonnet-5-5", message="go",
+                         handle=lambda name, args: f"result for {args['uarn']}", verbose=False)
     assert client.created["budget"]["max_list_cost"] == {"amount": "200", "currency": "USD"}
     sent = {e["type"]: e for e in client.sent}
     assert sent["user.custom_tool_result"]["content"][0]["text"] == "result for 1001008"
@@ -223,8 +223,9 @@ def test_run_session_stops_at_token_budget(store, monkeypatch):
              cache_creation_input_tokens=0)
     client = FakeClient([NS(type="span.model_request_end", model_usage=big), idle("end_turn")],
                         usage)
-    result = run_session(client, store, agent="a", environment_id="e", model="claude-sonnet-5-5",
-                         agent_name="builder", kickoff="go")
+    result = run_session(client, store, agent="builder", agent_id="a", environment_id="e",
+                         title="t", model="claude-sonnet-5-5", message="go", handle=None,
+                         verbose=False)
     assert result.stop_reason.startswith("token budget reached")
     assert {"type": "user.interrupt"} in client.sent
     assert "budget_stop" in kinds(store)

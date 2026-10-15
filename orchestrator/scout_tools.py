@@ -5,7 +5,7 @@ on the Scout's session stream. Route every custom tool call through this:
 
     router = ScoutToolRouter(store, data)
     router.register("save_candidates", my_scout_handler)   # the Scout's own tools
-    run_session(client, store, ..., agent_name="scout", tool_handler=router)
+    run_session(client, store, agent="scout", ..., handle=router, run_id=scout_run_id)
 
 or, in a hand-written loop:
 

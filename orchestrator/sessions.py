@@ -1,25 +1,34 @@
-"""One loop for every Managed Agents session the orchestrator runs.
+"""Run one Managed Agents session to the end, answering its custom tool calls.
 
-- Every session gets a hard dollar cap (budget.platform_budget) plus a client-side
-  token budget and turn cap; past either, the session is interrupted.
-- Custom tool calls (including those from a workflow run's threads, which arrive
-  on the primary stream) go to `tool_handler(name, input) -> str`.
-- Tool calls that pause for approval are denied: nobody watches these sessions,
-  and no agent may file, send or submit anything.
+One loop for every session the orchestrator runs (builder test sessions, the
+advocate, the Scout):
+
+- Every session gets a hard dollar cap (budget.platform_budget) plus a client
+  meter with a token budget, a turn cap and an optional dollar stop; past any
+  of them, the session is interrupted and a budget_stop event is written.
+- Custom tool calls, including those from a workflow run's threads (which
+  arrive on the primary stream), go to handle(name, input). A failing handler
+  gets an is_error result, so the session is never left waiting on a tool.
+- Tool calls that pause for approval are denied: nobody watches these
+  sessions, and no agent may file, send or submit anything.
+- An end_turn idle with a workflow run still open isn't the end: the agent
+  takes a turn on each run's ending notice.
 - When the session stops, its spend is written to events from session.usage,
-  which covers every thread, workflow runs included.
+  which covers every thread, workflow runs included, with cost_usd.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, Callable
 
 import anthropic
 
 from orchestrator import budget
-from orchestrator.config import trace_url
+from orchestrator.config import ROOT, trace_url
 from orchestrator.store import Store
 
 log = logging.getLogger(__name__)
@@ -27,12 +36,22 @@ log = logging.getLogger(__name__)
 ToolHandler = Callable[[str, dict[str, Any]], str]
 
 
+def resource_id(env_var: str, path: str, lock_file: str = "claude-lock.json") -> str:
+    """An agent or environment ID: from env_var, else from the lockfile
+    (lock_file relative to the repo root; path relative to the lockfile)."""
+    if os.getenv(env_var):
+        return os.environ[env_var]
+    lock = json.loads((ROOT / lock_file).read_text())
+    return lock["resources"][path]["id"]
+
+
 @dataclass
 class SessionResult:
     session_id: str
     stop_reason: str
-    tokens: int            # all threads, from session.usage
-    list_cost_cents: int
+    meter: budget.SpendMeter
+    tokens: int = 0               # all threads, from session.usage (meter's count if unavailable)
+    list_cost_cents: int = 0
 
 
 def usage_tokens(usage: Any) -> int:
@@ -46,46 +65,46 @@ def usage_tokens(usage: Any) -> int:
     return total
 
 
-def run_session(
-    client: anthropic.Anthropic,
-    store: Store,
-    *,
-    agent: str,
-    environment_id: str,
-    model: str,
-    agent_name: str,           # events.agent: scout | builder | advocate | ...
-    kickoff: str,
-    tool_handler: ToolHandler | None = None,
-    case_id: str | None = None,
-    title: str | None = None,
-    on_text: Callable[[str], None] | None = None,
-) -> SessionResult:
-    session = client.beta.sessions.create(
-        agent=agent, environment_id=environment_id, title=title,
-        budget=budget.platform_budget(model),
-    )
-    store.add_event(agent_name, "session_started", f"{title or agent_name}: {trace_url(session.id)}",
-                    case_id=case_id, payload={"session_id": session.id})
+def run_session(client, store: Store, *, agent: str, agent_id: str, environment_id: str,
+                title: str, model: str, message: str, handle: ToolHandler | None,
+                meter: budget.SpendMeter | None = None, max_usd: float | None = None,
+                case_id: str | None = None, run_id: str | None = None, label: str = "",
+                verbose: bool = True) -> SessionResult:
+    """Start a session, send one user message, and answer custom tool calls with
+    handle(name, input) until the agent is done or a budget stops it.
 
-    meter = budget.SpendMeter()
+    agent is the events.agent name (builder, advocate, scout, ...)."""
+    say = print if verbose else (lambda *a, **k: None)
+    meter = meter or budget.SpendMeter(model=model)
+    label = label or title
+    session = client.beta.sessions.create(
+        agent=agent_id, environment_id=environment_id, title=title,
+        budget=budget.platform_budget(model, max_usd=max_usd),
+    )
+    store.add_event(agent, "session_started", f"{title}: {trace_url(session.id)}",
+                    case_id=case_id, run_id=run_id, payload={"session_id": session.id})
+    say(f"Session {session.id}\nTrace: {trace_url(session.id)}\n")
+
     open_runs: set[str] = set()
     stop_reason = "unknown"
     with client.beta.sessions.events.stream(session_id=session.id) as stream:
-        client.beta.sessions.events.send(session_id=session.id, events=[{
-            "type": "user.message", "content": [{"type": "text", "text": kickoff}]}])
+        _send(client, session.id, {"type": "user.message",
+                                   "content": [{"type": "text", "text": message}]})
         for event in stream:
             kind = event.type
-            if kind == "agent.message" and on_text:
+            if kind == "agent.message":
                 for block in event.content:
                     if block.type == "text":
-                        on_text(block.text)
+                        say(block.text, flush=True)
             elif kind == "agent.custom_tool_use":
-                _answer_tool(client, session.id, event, tool_handler)
+                say(f"  -> {event.name} {json.dumps(event.input)[:160]}")
+                text = _answer_tool(client, store, session.id, event, handle, agent, case_id)
+                say(f"  <- {text.splitlines()[0][:160] if text else ''}")
             elif kind in ("agent.tool_use", "agent.mcp_tool_use") \
                     and getattr(event, "evaluated_permission", None) == "ask":
-                store.add_event(agent_name, "tool_denied",
+                store.add_event(agent, "tool_denied",
                                 f"denied {getattr(event, 'name', kind)}: unattended session",
-                                case_id=case_id)
+                                case_id=case_id, run_id=run_id)
                 _send(client, session.id, {"type": "user.tool_confirmation",
                                            "tool_use_id": event.id, "result": "deny"})
             elif kind == "workflow_run.created":
@@ -95,8 +114,8 @@ def run_session(
             elif kind == "span.model_request_end":
                 meter.add(event.model_usage)
                 if reason := meter.exceeded:
-                    store.add_event(agent_name, "budget_stop", reason, case_id=case_id,
-                                    tokens=meter.tokens)
+                    store.add_event(agent, "budget_stop", f"{label}: {reason}",
+                                    case_id=case_id, run_id=run_id, tokens=meter.tokens)
                     _send(client, session.id, {"type": "user.interrupt"})
                     stop_reason = reason
                     break
@@ -112,26 +131,37 @@ def run_session(
                 stop_reason = "terminated"
                 break
 
-    final = client.beta.sessions.retrieve(session.id)
-    tokens = usage_tokens(final.usage)
-    cents = int(final.usage.list_cost.amount) if final.usage.list_cost else 0
-    store.add_event(agent_name, "session_spend",
-                    f"{title or agent_name}: {tokens:,} tokens, {cents} cents list cost "
-                    f"({stop_reason})", case_id=case_id, tokens=tokens,
-                    cost_usd=cents / 100, idempotency_key=f"spend:{session.id}",
+    tokens, cents = meter.tokens, None
+    try:   # session.usage covers every thread; the meter only sees the primary stream
+        usage = client.beta.sessions.retrieve(session.id).usage
+        tokens = usage_tokens(usage) or tokens
+        cents = int(usage.list_cost.amount) if usage.list_cost else None
+    except Exception:
+        log.warning("could not read usage for %s; logging the meter's count", session.id)
+    cost_usd = cents / 100 if cents is not None else round(meter.cost_usd, 4) or None
+    cost_text = f", {cents} cents list cost" if cents is not None else (
+        f", ~${meter.cost_usd:.2f}" if meter.model else "")
+    store.add_event(agent, "session_spend",
+                    f"{label}: {tokens:,} tokens over {meter.turns} model requests"
+                    f"{cost_text} ({stop_reason})",
+                    case_id=case_id, run_id=run_id, tokens=tokens, cost_usd=cost_usd,
+                    idempotency_key=f"spend:{session.id}",
                     payload={"session_id": session.id, "stop_reason": stop_reason,
                              "model": model})
-    return SessionResult(session.id, stop_reason, tokens, cents)
+    return SessionResult(session.id, stop_reason, meter, tokens, cents or 0)
 
 
-def _answer_tool(client, session_id: str, event, handler: ToolHandler | None) -> None:
+def _answer_tool(client, store: Store, session_id: str, event, handle: ToolHandler | None,
+                 agent: str, case_id: str | None) -> str:
     try:
-        if handler is None:
+        if handle is None:
             raise LookupError("this session has no custom tool handler")
-        text, is_error = handler(event.name, dict(event.input)), False
-    except Exception as e:   # the agent sees a short error; details go to the log
+        text, is_error = handle(event.name, dict(event.input)), False
+    except Exception as e:   # never leave the session waiting on a tool
         log.exception("custom tool %s failed", event.name)
-        text, is_error = f"ERROR: {type(e).__name__}: tool failed, try again or stop", True
+        store.add_event(agent, "tool_error", f"{event.name}: {type(e).__name__}",
+                        case_id=case_id)
+        text, is_error = f"ERROR: {event.name} failed ({type(e).__name__}); try again later", True
     try:
         _send(client, session_id, {"type": "user.custom_tool_result",
                                    "custom_tool_use_id": event.id,
@@ -140,6 +170,7 @@ def _answer_tool(client, session_id: str, event, handler: ToolHandler | None) ->
     except anthropic.BadRequestError as e:
         # A workflow run can archive the calling thread before the answer arrives.
         log.warning("answer to %s refused: %s", event.name, e.message)
+    return text
 
 
 def _send(client, session_id: str, event: dict) -> None:

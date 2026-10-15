@@ -13,26 +13,16 @@ Needs: DATA_SERVICE_URL, and the agent and environment created with
 
 from __future__ import annotations
 
-import json
-import os
 import sys
-from pathlib import Path
 
 from agents.builder.handlers import AGENT, BuilderHandlers
-from orchestrator.config import anthropic_client, load_env, trace_url
+from orchestrator import budget
+from orchestrator.config import anthropic_client, load_env
 from orchestrator.data_client import DataClient
-from orchestrator.sessions import run_session
+from orchestrator.sessions import resource_id, run_session
 from orchestrator.store import Store, get_store
 
-ROOT = Path(__file__).resolve().parents[2]
 MODEL = "claude-sonnet-5-5"   # keep in step with agent.md
-
-
-def resource_id(env_var: str, path: str) -> str:
-    if os.getenv(env_var):
-        return os.environ[env_var]
-    lock = json.loads((ROOT / "claude-lock.json").read_text())
-    return lock["resources"][path]["id"]
 
 
 def ensure_candidate(store: Store, data: DataClient, uarn: str) -> None:
@@ -58,23 +48,17 @@ def run(uarn: str) -> None:
     handlers = BuilderHandlers(store, data)
     ensure_candidate(store, data, uarn)
 
-    def tool(name: str, args: dict) -> str:
-        print(f"  -> {name} {json.dumps(args)[:160]}")
-        result = handlers.handle(name, args)
-        print(f"  <- {result.splitlines()[0][:160]}")
-        return result
-
     result = run_session(
-        client, store,
-        agent=resource_id("BUILDER_AGENT_ID", "./agents/builder/agent.md"),
+        client, store, agent=AGENT,
+        agent_id=resource_id("BUILDER_AGENT_ID", "./agents/builder/agent.md"),
         environment_id=resource_id("BUILDER_ENV_ID", "./agents/builder/environment.yaml"),
-        model=MODEL, agent_name=AGENT, kickoff=f"Candidate UARN: {uarn}",
-        tool_handler=tool, title=f"builder test {uarn}", on_text=print,
+        title=f"builder test {uarn}", model=MODEL,
+        message=f"Candidate UARN: {uarn}", handle=handlers.handle,
+        meter=budget.SpendMeter(model=MODEL), label=uarn,
     )
     cand = store.get_candidate(uarn)
-    print(f"\nSession {result.session_id}: {trace_url(result.session_id)}\n"
-          f"Stopped: {result.stop_reason}. Tokens: {result.tokens:,}, "
-          f"{result.list_cost_cents} cents. Candidate status: {cand['status'] if cand else '?'}")
+    print(f"\nStopped: {result.stop_reason}. Tokens: {result.meter.tokens:,}. "
+          f"Candidate status: {cand['status'] if cand else '?'}")
 
 
 if __name__ == "__main__":

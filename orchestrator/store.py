@@ -20,7 +20,7 @@ import os
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -45,8 +45,21 @@ Where = list[tuple[str, str, Any]]          # (column, op, value); op: eq | in |
 Order = list[tuple[str, bool]]              # (column, descending)
 
 
+_clock_lock = threading.Lock()
+_last_ts: datetime | None = None
+
+
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    """UTC now, strictly increasing within this process. Rows are ordered by
+    created_at / ts, and the Windows clock can return the same value for many
+    calls in a row, so a repeat is nudged forward by a microsecond."""
+    global _last_ts
+    with _clock_lock:
+        ts = datetime.now(timezone.utc)
+        if _last_ts is not None and ts <= _last_ts:
+            ts = _last_ts + timedelta(microseconds=1)
+        _last_ts = ts
+        return ts.isoformat()
 
 
 def new_id() -> str:
@@ -64,6 +77,7 @@ class Store(Protocol):
     def save_pdf(self, case_id: str, data: bytes) -> str: ...
     def insert_verdict(self, row: dict[str, Any]) -> None: ...
     def latest_verdict(self, case_id: str) -> dict[str, Any] | None: ...
+    def list_verdicts(self, case_id: str) -> list[dict[str, Any]]: ...
     def insert_case(self, row: dict[str, Any]) -> None: ...
     def get_case(self, case_id: str) -> dict[str, Any] | None: ...
     def update_case(self, case_id: str, changes: dict[str, Any]) -> None: ...
@@ -225,13 +239,17 @@ class BaseStore:
         })
 
     def latest_verdict(self, case_id: str) -> dict[str, Any] | None:
+        verdicts = self.list_verdicts(case_id)
+        return verdicts[-1] if verdicts else None
+
+    def list_verdicts(self, case_id: str) -> list[dict[str, Any]]:
+        """Every verdict for a pack, oldest first. reasons = [{reason, voa_record, kind}]."""
         keys = self._keys(case_id)
         if keys["case_id"] is None:
-            return None
-        row = self._one("verdicts", [("case_id", "eq", keys["case_id"])], [("created_at", True)])
-        if row is None:
-            return None
-        return {**row, "case_id": case_id, "version": row["advocate_version"]}
+            return []
+        rows = self._select("verdicts", [("case_id", "eq", keys["case_id"])],
+                            [("created_at", False)])
+        return [{**r, "case_id": case_id, "version": r["advocate_version"]} for r in rows]
 
     # -- cases -----------------------------------------------------------------
     def _case_view(self, row: dict[str, Any], ref: str) -> dict[str, Any]:

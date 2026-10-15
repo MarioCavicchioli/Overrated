@@ -1,0 +1,44 @@
+{
+  "_note": "Hand-written weak pack for the advocate tests: the subject is a restaurant, but every comparable is a shop or cafe (there is no other restaurant on Broadway Market). Figures are correct, so only the choice of comparables is wrong. Expect kill for different use.",
+  "pack": {
+    "case_id": "c_0004",
+    "uarn": "1003007",
+    "address": "22 Broadway Market, Hackney, London E8 4QJ",
+    "current_rv": 30100,
+    "proposed_rv": 25209,
+    "comparables": [
+      {
+        "uarn": "1003006",
+        "zone_a_price": 330,
+        "distance_m": 20,
+        "use": "shop"
+      },
+      {
+        "uarn": "1003008",
+        "zone_a_price": 315,
+        "distance_m": 20,
+        "use": "shop"
+      },
+      {
+        "uarn": "1003005",
+        "zone_a_price": 355,
+        "distance_m": 45,
+        "use": "cafe"
+      },
+      {
+        "uarn": "1003009",
+        "zone_a_price": 340,
+        "distance_m": 45,
+        "use": "shop"
+      }
+    ],
+    "calc": {
+      "zone_a_price": 400,
+      "street_median": 330,
+      "street_spread": 20
+    },
+    "annual_saving": 1868,
+    "argument": "Your premises at 22 Broadway Market are valued at a Zone A price of £400 per m2, giving a rateable value of £30,100. The Broadway Market median is £330 with a spread of £20, so your price is far above the street. The nearest units are valued much lower: 1003006 at £330 (20 m), 1003008 at £315 (20 m), 1003009 at £340 (45 m) and 1003005 at £355 (45 m). The median of these four is £335 per m2. Applying it to your 75.25 m2 ITZA gives a proposed rateable value of £25,209. We suggest asking the valuation office to review the value in light of these neighbouring units. The outcome cannot be guaranteed.",
+    "version": "hand-written"
+  }
+}
