@@ -20,7 +20,7 @@ from pathlib import Path
 
 from agents.builder.handlers import AGENT, BuilderHandlers
 from orchestrator import budget
-from orchestrator.config import anthropic_client, load_env
+from orchestrator.config import anthropic_client, load_env, trace_url
 from orchestrator.data_client import DataClient
 from orchestrator.store import Store, get_store
 
@@ -65,8 +65,7 @@ def run(uarn: str) -> None:
         budget=budget.platform_budget(MODEL),
     )
     store.add_event(AGENT, "session_started", f"test session for {uarn}")
-    print(f"Session {session.id}\n"
-          f"Trace: https://platform.claude.com/workspaces/default/sessions/{session.id}\n")
+    print(f"Session {session.id}\nTrace: {trace_url(session.id)}\n")
 
     meter = budget.SpendMeter()
     stop_reason = "unknown"

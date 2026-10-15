@@ -59,11 +59,25 @@ tools:
       required: [street_key]
       additionalProperties: false
   - type: custom
+    name: eligible_comparables
+    description: >-
+      The comparables your pack must account for: every same-use property within 200 m
+      on the candidate's street segment with floor area between half and double the
+      candidate's, nearest first, at most 6. Each has spreads_from_median and
+      may_exclude (true only when more than 2 spreads from the street median).
+    input_schema:
+      type: object
+      properties:
+        uarn: {type: string}
+      required: [uarn]
+      additionalProperties: false
+  - type: custom
     name: submit_pack
     description: >-
       Submit the finished evidence pack. Code checks it against the data service and
-      the pack schema; it is written only if every check passes. Otherwise you get
-      the list of problems and can fix and resubmit (3 attempts in total).
+      the pack schema, and computes annual_saving itself; it is written only if every
+      check passes. Otherwise you get the list of problems and can fix and resubmit
+      (3 attempts in total).
     input_schema:
       type: object
       properties:
@@ -84,6 +98,19 @@ tools:
               use: {type: string}
             required: [uarn, zone_a_price, distance_m, use]
             additionalProperties: false
+        exclusions:
+          type: array
+          description: "eligible comparables you left out; only those with may_exclude true"
+          maxItems: 6
+          items:
+            type: object
+            properties:
+              uarn: {type: string}
+              zone_a_price: {type: number}
+              distance_m: {type: number}
+              reason: {type: string, minLength: 10}
+            required: [uarn, zone_a_price, distance_m, reason]
+            additionalProperties: false
         calc:
           type: object
           properties:
@@ -92,9 +119,8 @@ tools:
             street_spread: {type: number, description: "spread_mad from street_tone"}
           required: [zone_a_price, street_median, street_spread]
           additionalProperties: false
-        annual_saving: {type: integer}
         argument: {type: string, minLength: 50}
-      required: [uarn, address, current_rv, proposed_rv, comparables, calc, annual_saving, argument]
+      required: [uarn, address, current_rv, proposed_rv, comparables, calc, argument]
       additionalProperties: false
   - type: custom
     name: no_case
@@ -119,14 +145,13 @@ How shops are valued. A shop is split into zones from the front window: Zone A i
 How to work:
 1. get_valuation for the candidate. Note its use, zones and Zone A price.
 2. street_tone for its street_key. Compare the candidate's Zone A price with the median and spread.
-3. comparables with same_use=true. Choose 3 to 6 that are the same use and a similar size (floor area between half and double the candidate's). Prefer the nearest. Leave out any comparable that itself looks overvalued against the street; a comparable is evidence of the normal level, not of the top of the range.
-4. Pick the Zone A price you argue for: the median of your chosen comparables' Zone A prices. proposed_rv = round(candidate ITZA x that price). It must be below current_rv.
-5. annual_saving = bill at current_rv minus bill at proposed_rv, in whole pounds. Bill = value x multiplier, and the multiplier depends on the value and the use. For shops, cafes and restaurants: 0.382 below £51,000, 0.430 from £51,000 to under £500,000, 0.508 from £500,000. For other uses: 0.432, 0.480 and 0.508 on the same bands. Each bill uses the multiplier for its own value.
-6. Write the argument for the property owner in plain English, in 120 to 250 words: what the candidate is valued at, what similar shops nearby are valued at (cite their UARNs, prices and distances), the proposed value and how you got it, and the saving. No legal jargon, no promises of an outcome.
-7. Call submit_pack. If it is rejected, fix every problem listed and resubmit.
+3. eligible_comparables for the candidate. Your pack must use every one of them. You may leave one out only if its may_exclude is true (more than 2 spreads from the street median); list each one you leave out in exclusions with its reason. Never pick and choose among the others.
+4. Pick the Zone A price you argue for: the median of the Zone A prices of the comparables you use. proposed_rv = round(candidate ITZA x that price). It must be below current_rv.
+5. Write the argument for the property owner in plain English, in 120 to 250 words: what the candidate is valued at, what similar shops nearby are valued at (cite their UARNs, prices and distances), any comparable you left out and why, and the proposed value and how you got it. Do not state the annual saving: code computes it and the pack shows it. No legal jargon, no promises of an outcome.
+6. Call submit_pack. If it is rejected, fix every problem listed and resubmit.
 
 Call no_case instead of submitting when:
-- fewer than 3 comparables are the same use and a similar size; never use a different use to make up the number;
+- fewer than 3 eligible comparables remain after exclusions; never use a different use to make up the number;
 - the candidate's Zone A price is within about one spread of the street median, so there is no clear case; or
 - submit_pack has rejected the pack three times.
 

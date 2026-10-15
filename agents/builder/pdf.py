@@ -64,6 +64,15 @@ def render_pack_pdf(pack: dict) -> bytes:
         pdf.ln()
     pdf.ln(3)
 
+    if pack.get("exclusions"):
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(w, 7, "Comparables left out", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 10)
+        for ex in pack["exclusions"]:
+            _para(pdf, f"{ex['uarn']} (Zone A £{_num(ex['zone_a_price'])}/m2, "
+                       f"{_num(ex['distance_m'])} m): {ex['reason']}", 5)
+        pdf.ln(3)
+
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(w, 7, "Argument", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 11)

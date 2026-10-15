@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import re
+import statistics
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from agents.builder import rates
-from agents.builder.checks import check_pack, itza
+from agents.builder.checks import check_pack, eligible_comparables, itza
 from agents.builder.handlers import BuilderHandlers
 from data.mock.main import app
 from orchestrator.data_client import DataClient
@@ -30,25 +32,36 @@ def store(tmp_path) -> SQLiteStore:
     return SQLiteStore(tmp_path / "t.db", tmp_path / "pdfs")
 
 
-def good_pack(data: DataClient) -> dict:
-    """A correct pack for outlier 1001008 (137 Mare Street, ZA £550)."""
-    s = data.get_valuation("1001008")
-    tone = data.street_tone("mare_street")
-    pool = {c["uarn"]: c for c in data.comparables("1001008", same_use=True)}
-    picks = ["1001009", "1001006", "1001011", "1001004"]   # 410, 400, 445, 390
-    comps = [{"uarn": u, "zone_a_price": pool[u]["zone_a_price"],
-              "distance_m": pool[u]["distance_m"], "use": pool[u]["use"]} for u in picks]
-    proposed = round(itza(s) * 405)                         # median of the four
-    return {
-        "case_id": "c_0000", "version": "builder-v1", "uarn": "1001008",
+def build_pack(data: DataClient, uarn: str, exclude: tuple[str, ...] = ()) -> dict:
+    """A correct pack: every eligible comparable used, except those in `exclude`."""
+    s = data.get_valuation(uarn)
+    tone = data.street_tone(s["street_key"])
+    eligible = eligible_comparables(uarn, data)
+    comps = [{k: c[k] for k in ("uarn", "zone_a_price", "distance_m", "use")}
+             for c in eligible if c["uarn"] not in exclude]
+    exclusions = [{"uarn": c["uarn"], "zone_a_price": c["zone_a_price"],
+                   "distance_m": c["distance_m"],
+                   "reason": f"{c['spreads_from_median']} spreads above the street median"}
+                  for c in eligible if c["uarn"] in exclude]
+    proposed = round(itza(s) * statistics.median(c["zone_a_price"] for c in comps))
+    pack = {
+        "case_id": "c_0000", "version": "builder-v1", "uarn": uarn,
         "address": s["address"], "current_rv": s["rv"], "proposed_rv": proposed,
         "comparables": comps,
         "calc": {"zone_a_price": s["zone_a_price"], "street_median": tone["median_zone_a"],
                  "street_spread": tone["spread_mad"]},
-        "annual_saving": rates.annual_saving(s["rv"], proposed, "shop"),
-        "argument": "Four shops of similar size within 90 m on Mare Street are valued at "
-                    "£390-£445 per m2 in Zone A; this shop is valued at £550.",
+        "annual_saving": rates.annual_saving(s["rv"], proposed, s["use"]),
+        "argument": "Similar shops nearby on the same street are valued at a lower Zone A "
+                    "price per m2 than this shop.",
     }
+    if exclusions:
+        pack["exclusions"] = exclusions
+    return pack
+
+
+def good_pack(data: DataClient) -> dict:
+    """A correct pack for outlier 1001008 (137 Mare Street, ZA £550): all six eligible."""
+    return build_pack(data, "1001008")
 
 
 # -- rates ---------------------------------------------------------------
@@ -97,6 +110,39 @@ def test_proposed_rv_outside_comparable_range_rejected(data):
     assert any("outside the comparables' range" in e for e in check_pack(pack, data))
 
 
+def test_eligible_set_for_outlier(data):
+    eligible = eligible_comparables("1001008", data)
+    assert [c["uarn"] for c in eligible] == \
+        ["1001009", "1001006", "1001011", "1001004", "1001012", "1001003"]
+    assert not any(c["may_exclude"] for c in eligible)
+
+
+def test_cherry_picked_fixture_rejected(data):
+    """c_0001 from the first live run left out 1001011, 1001012 and 1001003."""
+    pack = json.loads((ROOT / "tests" / "fixtures" / "pack_c_0001_cherry_picked.json")
+                      .read_text(encoding="utf-8"))["pack"]
+    errors = check_pack(pack, data)
+    for uarn in ("1001011", "1001012", "1001003"):
+        assert any(f"eligible comparable {uarn}" in e and "is missing" in e for e in errors)
+    assert any("annual_saving should be 3696" in e for e in errors)
+
+
+def test_exclusion_beyond_two_spreads_allowed(data):
+    # Borderline 1001012: the £550 outlier 1001008 is 5.3 spreads up, so it may go.
+    assert check_pack(build_pack(data, "1001012", exclude=("1001008",)), data) == []
+
+
+def test_exclusion_within_two_spreads_rejected(data):
+    pack = build_pack(data, "1001008", exclude=("1001011",))
+    assert any("only beyond 2 may be excluded" in e for e in check_pack(pack, data))
+
+
+def test_unlisted_omission_rejected(data):
+    pack = build_pack(data, "1001012")
+    pack["comparables"] = [c for c in pack["comparables"] if c["uarn"] != "1001008"]
+    assert any("eligible comparable 1001008" in e for e in check_pack(pack, data))
+
+
 def test_schema_errors_reported(data):
     pack = good_pack(data)
     pack["comparables"] = pack["comparables"][:2]
@@ -115,10 +161,13 @@ def test_submit_writes_pack_pdf_and_events(store, data):
     seed(store, data, "1001008")
     h = BuilderHandlers(store, data)
     args = {k: v for k, v in good_pack(data).items() if k not in ("case_id", "version")}
+    expected_saving = args.pop("annual_saving")
+    args["annual_saving"] = 1          # the model's figure is ignored
     result = h.handle("submit_pack", args)
     assert result.startswith("ACCEPTED. Pack c_0001")
     row = store.get_pack("c_0001")
     assert row["pack"]["case_id"] == "c_0001" and row["version"] == "builder-v1"
+    assert row["annual_saving"] == row["pack"]["annual_saving"] == expected_saving
     assert Path(row["pdf_url"].removeprefix("file:///")).exists()
     assert store.get_candidate("1001008")["status"] == "packed"
     assert [e["kind"] for e in store.list_events()] == ["pack_written"]

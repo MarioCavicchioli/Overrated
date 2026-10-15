@@ -22,6 +22,8 @@ VALIDATOR = Draft202012Validator(SCHEMA)
 
 COMP_MAX_DISTANCE_M = float(os.getenv("COMP_MAX_DISTANCE_M", "200"))
 SIZE_RATIO_MIN, SIZE_RATIO_MAX = 0.5, 2.0   # comparable floor area vs the subject's
+MAX_COMPARABLES = 6
+EXCLUDE_BEYOND_SPREADS = 2.0                 # an eligible comparable may be left out only past this
 PRICE_TOL = 0.5                              # GBP/m2, for rounding
 DISTANCE_TOL_M = 0.5
 
@@ -34,6 +36,37 @@ def itza(valuation: dict) -> float:
 
 def floor_area(valuation: dict) -> float:
     return sum(z["area_m2"] for z in valuation["zones"])
+
+
+def spreads_from_median(zone_a_price: float, tone: dict) -> float:
+    spread = tone["spread_mad"] or 1
+    return (zone_a_price - tone["median_zone_a"]) / spread
+
+
+def eligible_comparables(uarn: str, data: DataClient) -> list[dict]:
+    """The comparables a pack must use: every same-use property on the subject's
+    street segment within COMP_MAX_DISTANCE_M, with floor area between half and
+    double the subject's, nearest first, at most MAX_COMPARABLES.
+
+    Each entry carries spreads_from_median and whether it may be excluded.
+    """
+    subject = data.get_valuation(uarn)
+    tone = data.street_tone(subject["street_key"])
+    out = []
+    for c in data.comparables(uarn, max_distance=COMP_MAX_DISTANCE_M, same_use=True, limit=200):
+        record = data.get_valuation(c["uarn"])
+        ratio = floor_area(record) / floor_area(subject)
+        if not SIZE_RATIO_MIN <= ratio <= SIZE_RATIO_MAX:
+            continue
+        spreads = spreads_from_median(c["zone_a_price"], tone)
+        out.append({"uarn": c["uarn"], "zone_a_price": c["zone_a_price"],
+                    "distance_m": c["distance_m"], "use": c["use"],
+                    "floor_area_ratio": round(ratio, 2),
+                    "spreads_from_median": round(spreads, 2),
+                    "may_exclude": abs(spreads) > EXCLUDE_BEYOND_SPREADS})
+        if len(out) == MAX_COMPARABLES:
+            break
+    return out
 
 
 def schema_errors(pack: dict) -> list[str]:
@@ -108,6 +141,37 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
                           f"must be {SIZE_RATIO_MIN}-{SIZE_RATIO_MAX}x")
         comp_prices.append(record["zone_a_price"])
 
+    # No cherry-picking: the pack must use every eligible comparable, and may leave
+    # one out only if it is more than EXCLUDE_BEYOND_SPREADS from the street median.
+    eligible = {c["uarn"]: c for c in eligible_comparables(pack["uarn"], data)}
+    excluded: dict[str, dict] = {}
+    for i, ex in enumerate(pack.get("exclusions", [])):
+        tag = f"exclusions[{i}] {ex['uarn']}"
+        if ex["uarn"] in seen or ex["uarn"] in excluded:
+            errors.append(f"{tag}: listed twice, or both used and excluded")
+            continue
+        excluded[ex["uarn"]] = ex
+        e = eligible.get(ex["uarn"])
+        if e is None:
+            errors.append(f"{tag}: not an eligible comparable, so it needs no exclusion")
+            continue
+        if not e["may_exclude"]:
+            errors.append(f"{tag}: is {e['spreads_from_median']} spreads from the street median; "
+                          f"only beyond {EXCLUDE_BEYOND_SPREADS:g} may be excluded, so use it")
+        if abs(ex["zone_a_price"] - e["zone_a_price"]) > PRICE_TOL:
+            errors.append(f"{tag}: zone_a_price should be {e['zone_a_price']}")
+        if abs(ex["distance_m"] - e["distance_m"]) > DISTANCE_TOL_M:
+            errors.append(f"{tag}: distance_m should be {e['distance_m']}")
+    for uarn, e in eligible.items():
+        if uarn not in seen and uarn not in excluded:
+            errors.append(f"eligible comparable {uarn} (£{e['zone_a_price']}, {e['distance_m']} m, "
+                          f"{e['spreads_from_median']} spreads) is missing: use it, or list it in "
+                          "exclusions if it is more than 2 spreads from the median")
+    for uarn in seen - eligible.keys() - {pack["uarn"]}:
+        if uarn in pool:
+            errors.append(f"comparable {uarn} is not among the {MAX_COMPARABLES} nearest "
+                          "eligible comparables")
+
     if pack["proposed_rv"] >= pack["current_rv"]:
         errors.append("proposed_rv must be below current_rv")
 
@@ -120,8 +184,8 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
                           f"the comparables' range £{lo}-£{hi}; proposed_rv = ITZA "
                           f"({itza(subject):.2f} m2) x the Zone A price you argue for")
 
-    expected = rates.annual_saving(pack["current_rv"], pack["proposed_rv"], subject["use"])
-    if abs(pack["annual_saving"] - expected) > 1:
+    expected = rates.annual_saving(subject["rv"], pack["proposed_rv"], subject["use"])
+    if pack["proposed_rv"] < subject["rv"] and pack["annual_saving"] != expected:
         errors.append(f"annual_saving should be {expected} "
                       f"(bill at current_rv minus bill at proposed_rv, 2026 multipliers)")
 

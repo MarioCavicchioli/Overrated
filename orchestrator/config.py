@@ -31,6 +31,12 @@ def anthropic_client():
     return anthropic.Anthropic(default_headers=headers)
 
 
+def trace_url(session_id: str) -> str:
+    """Console link to a session, in the workspace the client sends requests to."""
+    workspace = os.getenv("ANTHROPIC_WORKSPACE_ID") or "default"
+    return f"https://platform.claude.com/workspaces/{workspace}/sessions/{session_id}"
+
+
 def env_int(name: str, default: int) -> int:
     """An integer setting; an empty value (as in .env.example) means the default."""
     return int(os.getenv(name) or default)

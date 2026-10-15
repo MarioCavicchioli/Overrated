@@ -16,7 +16,8 @@ import json
 from collections import defaultdict
 from typing import Any
 
-from agents.builder.checks import check_pack
+from agents.builder import rates
+from agents.builder.checks import check_pack, eligible_comparables
 from agents.builder.pdf import render_pack_pdf
 from orchestrator.data_client import DataClient, NotFound
 from orchestrator.store import Store
@@ -26,7 +27,7 @@ VERSION = "builder-v1"
 MAX_SUBMIT_ATTEMPTS = 3
 
 DATA_TOOLS = ("search_properties", "get_valuation", "comparables", "street_tone")
-TOOLS = DATA_TOOLS + ("submit_pack", "no_case")
+TOOLS = DATA_TOOLS + ("eligible_comparables", "submit_pack", "no_case")
 
 
 class BuilderHandlers:
@@ -41,6 +42,8 @@ class BuilderHandlers:
     def handle(self, name: str, args: dict[str, Any]) -> str:
         if name in DATA_TOOLS:
             return self._data_tool(name, args)
+        if name == "eligible_comparables":
+            return self._eligible(args)
         if name == "submit_pack":
             return self._submit_pack(args)
         if name == "no_case":
@@ -60,6 +63,16 @@ class BuilderHandlers:
         return (f'<data_service_result tool="{name}">\n'
                 f"{json.dumps(result, indent=1)}\n</data_service_result>")
 
+    def _eligible(self, args: dict[str, Any]) -> str:
+        try:
+            result = eligible_comparables(args.get("uarn", ""), self.data)
+        except NotFound as e:
+            return f"ERROR: {e}"
+        self.store.add_event(AGENT, "tool",
+                             f"eligible_comparables uarn={args.get('uarn')} -> {len(result)} result(s)")
+        return ('<data_service_result tool="eligible_comparables">\n'
+                f"{json.dumps(result, indent=1)}\n</data_service_result>")
+
     # -- submit_pack -----------------------------------------------------
     def _submit_pack(self, args: dict[str, Any]) -> str:
         uarn = args.get("uarn", "?")
@@ -69,8 +82,11 @@ class BuilderHandlers:
             return (f"REJECTED: no attempts left ({MAX_SUBMIT_ATTEMPTS} used). "
                     "Call no_case with the reason the pack could not be fixed.")
 
-        # case_id and version are set by code; a placeholder lets the schema check run.
-        pack = {**args, "case_id": "c_0000", "version": VERSION}
+        # case_id, version and annual_saving are set by code, never by the model;
+        # a placeholder case_id lets the schema check run.
+        pack = {k: v for k, v in args.items() if k != "annual_saving"}
+        pack.update(case_id="c_0000", version=VERSION,
+                    annual_saving=self._saving(uarn, pack.get("proposed_rv")))
         errors = check_pack(pack, self.data)
         if errors:
             self.store.add_event(AGENT, "pack_rejected",
@@ -95,7 +111,19 @@ class BuilderHandlers:
             f"{pack['address']}: £{pack['current_rv']:,} -> £{pack['proposed_rv']:,}, "
             f"saving £{pack['annual_saving']:,}/yr, {len(pack['comparables'])} comparables",
             case_id=pack["case_id"])
-        return f"ACCEPTED. Pack {pack['case_id']} written. Your work on this candidate is done."
+        return (f"ACCEPTED. Pack {pack['case_id']} written, annual saving "
+                f"£{pack['annual_saving']:,}. Your work on this candidate is done.")
+
+    def _saving(self, uarn: str, proposed_rv: Any) -> int:
+        """Bill difference from the data service's current value. 0 when it can't be
+        computed; check_pack then reports the real problem (unknown uarn, bad proposed_rv)."""
+        if not isinstance(proposed_rv, int):
+            return 0
+        try:
+            subject = self.data.get_valuation(uarn)
+        except NotFound:
+            return 0
+        return max(0, rates.annual_saving(subject["rv"], proposed_rv, subject["use"]))
 
     # -- no_case ---------------------------------------------------------
     def _no_case(self, args: dict[str, Any]) -> str:
