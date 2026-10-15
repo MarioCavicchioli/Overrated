@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "map-viewer",
+      "runtimeExecutable": ".venv/bin/uvicorn",
+      "runtimeArgs": ["data.viewer:app", "--host", "127.0.0.1", "--port", "8100"],
+      "port": 8100
+    }
+  ]
+}
