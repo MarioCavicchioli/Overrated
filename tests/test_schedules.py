@@ -25,7 +25,7 @@ def open_case(store, case_id, stage="check", deadline=None):
                        "proposed_rv": 1, "annual_saving": 1, "argument": "x" * 50,
                        "version": "t"})
     store.insert_case({"case_id": case_id, "uarn": uarn, "stage": stage,
-                       "owner_approved": stage != "awaiting_owner", "history": [],
+                       "owner_approved": stage != "waiting_owner", "history": [],
                        "next_deadline": deadline})
 
 
@@ -68,7 +68,8 @@ def test_reply_for_closed_or_unknown_case_is_skipped(store):
     store.add_event("voa", "voa_reply", "late reply", case_id="c_0001")
     store.add_event("voa", "voa_reply", "no case", case_id="c_9999")
     run(s.tick())
-    assert calls == [] and s.cursor == store.last_event("voa_reply")["id"]
+    last = store.last_event("voa_reply")
+    assert calls == [] and s.cursor_ts == last["ts"] and last["id"] in s.cursor_ids
 
 
 def test_deadline_within_three_days_wakes_once_a_day(store):
@@ -90,7 +91,7 @@ def test_deadline_within_three_days_wakes_once_a_day(store):
 
 def test_daily_sweep_wakes_open_cases_once(store):
     open_case(store, "c_0001")
-    open_case(store, "c_0002", stage="awaiting_owner")   # not approved: not swept
+    open_case(store, "c_0002", stage="waiting_owner")   # not approved: not swept
     open_case(store, "c_0003", stage="won")
     clock, calls = [NOON.replace(hour=6)], []
     s = sched(store, clock, calls)

@@ -59,17 +59,28 @@ class Scheduler:
         self.queued: list[str] = []      # recorded wakes waiting for a free slot
         self.rerun: set[str] = set()     # replies that came in while the case was running
         self.lock = threading.Lock()
-        self.cursor: int | None = None   # last voa_reply event id dealt with
-        self.seen_reply: int | None = None
+        # voa_reply events dealt with: the newest ts seen, and the ids seen at that ts.
+        self.cursor_ts: str | None = None
+        self.cursor_ids: set[str] = set()
+        self.cursor_loaded = False
+        self.seen_replies: list[tuple[str, str]] = []
 
     # -- decisions ---------------------------------------------------------
-    def _reply_cursor(self) -> int:
-        """Id of the last voa_reply event already handled (kept in the wake event's message)."""
+    def _load_cursor(self) -> None:
+        """After a restart, resume from the reply the last reply wake recorded in its payload."""
         last = self.store.last_event(WAKE_KIND["voa_reply"])
-        if last is None:
-            return 0
-        head = last["message"].split(":", 1)[0]          # "voa_reply #123"
-        return int(head.rsplit("#", 1)[1]) if "#" in head else 0
+        payload = (last or {}).get("payload") or {}
+        if payload.get("reply_ts"):
+            self.cursor_ts, self.cursor_ids = payload["reply_ts"], {payload["reply_event_id"]}
+        self.cursor_loaded = True
+
+    def _advance_cursor(self) -> None:
+        if not self.seen_replies:
+            return
+        newest = max(ts for ts, _ in self.seen_replies)
+        ids = {i for ts, i in self.seen_replies if ts == newest}
+        self.cursor_ids = (self.cursor_ids | ids) if newest == self.cursor_ts else ids
+        self.cursor_ts = newest
 
     def _woken_since(self, case_id: str, since: datetime, kinds=tuple(WAKE_KIND.values())) -> bool:
         for kind in kinds:
@@ -78,20 +89,22 @@ class Scheduler:
                 return True
         return False
 
-    def due_wakes(self) -> list[tuple[str, str, str, int | None]]:
-        """(case_id, reason, detail, reply_id) for every wake due now, at most one per case."""
+    def due_wakes(self) -> list[tuple[str, str, str, dict]]:
+        """(case_id, reason, detail, payload) for every wake due now, at most one per case."""
         now = self.now()
         today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        due: dict[str, tuple[str, str, int | None]] = {}
+        due: dict[str, tuple[str, str, dict]] = {}
 
-        if self.cursor is None:
-            self.cursor = self._reply_cursor()
-        for ev in self.store.events_after("voa_reply", self.cursor):
+        if not self.cursor_loaded:
+            self._load_cursor()
+        for ev in self.store.events_since("voa_reply", self.cursor_ts):
+            if ev["ts"] == self.cursor_ts and ev["id"] in self.cursor_ids:
+                continue
             case = self.store.get_case(ev["case_id"]) if ev.get("case_id") else None
             if case and case["stage"] not in ("won", "lost", "closed"):
-                due.setdefault(ev["case_id"],
-                               ("voa_reply", f"voa_reply #{ev['id']}: VOA replied", ev["id"]))
-            self.seen_reply = ev["id"]   # replies needing no wake are dealt with
+                due.setdefault(ev["case_id"], ("voa_reply", "VOA replied",
+                                               {"reply_event_id": ev["id"], "reply_ts": ev["ts"]}))
+            self.seen_replies.append((ev["ts"], ev["id"]))   # no-wake replies are dealt with too
 
         open_cases = self.store.list_cases(OPEN_STAGES)
         for case in open_cases:
@@ -100,15 +113,22 @@ class Scheduler:
                 continue
             if parse_ts(deadline) <= now + DEADLINE_WINDOW and not self._woken_since(
                     cid, now - timedelta(days=1), (WAKE_KIND["deadline"],)):
-                due[cid] = ("deadline", f"deadline {deadline} is within 3 days", None)
+                due[cid] = ("deadline", f"deadline {deadline} is within 3 days",
+                            {"deadline": deadline})
 
         if now.hour >= self.daily_hour:
             for case in open_cases:
                 cid = case["case_id"]
                 if cid not in due and not self._woken_since(cid, today):
-                    due[cid] = ("daily", "daily sweep", None)
+                    due[cid] = ("daily", "daily sweep", {"day": str(now.date())})
 
         return [(cid, *rest) for cid, rest in due.items()]
+
+    def _record_wake(self, case_id: str, reason: str, detail: str, payload: dict) -> None:
+        key = payload.get("reply_event_id") or payload.get("deadline") or payload.get("day")
+        self.store.add_event(AGENT, WAKE_KIND[reason], detail, case_id=case_id,
+                             ts=self._stamp(), payload=payload,
+                             idempotency_key=f"wake:{reason}:{case_id}:{key}:{self._stamp()[:10]}")
 
     def _stamp(self) -> str:
         """Trigger events carry the scheduler's own clock, which the dedupe checks compare to."""
@@ -124,23 +144,19 @@ class Scheduler:
     # -- one pass ----------------------------------------------------------
     def tick(self) -> list[Callable[[], None]]:
         """Record every trigger that is due and return the jobs to run."""
-        self.seen_reply = None
-        for case_id, reason, detail, _ in self.due_wakes():
+        self.seen_replies = []
+        for case_id, reason, detail, payload in self.due_wakes():
             with self.lock:
                 running, waiting = case_id in self.in_flight, case_id in self.queued
-            if running or waiting:
-                if reason == "voa_reply":   # don't lose a reply to a session already running
-                    self.store.add_event(AGENT, WAKE_KIND[reason], detail, case_id=case_id,
-                                         ts=self._stamp())
-                    with self.lock:
-                        if running:
-                            self.rerun.add(case_id)
+            if (running or waiting) and reason != "voa_reply":
                 continue
-            self.store.add_event(AGENT, WAKE_KIND[reason], detail, case_id=case_id, ts=self._stamp())
+            self._record_wake(case_id, reason, detail, payload)
             with self.lock:
-                self.queued.append(case_id)
-        if self.seen_reply is not None:
-            self.cursor = self.seen_reply
+                if running:       # a reply for a session already running: run it once more
+                    self.rerun.add(case_id)
+                elif not waiting:
+                    self.queued.append(case_id)
+        self._advance_cursor()
 
         jobs: list[Callable[[], None]] = []
         with self.lock:
@@ -149,9 +165,9 @@ class Scheduler:
                 self.in_flight.add(case_id)
                 jobs.append(lambda cid=case_id: self._run_caseworker(cid))
         if self.playbook_due():
-            self.store.add_event(AGENT, "playbook_triggered",
-                                 f"nightly playbook run for {self.now().date()}",
-                                 ts=self._stamp())
+            day = str(self.now().date())
+            self.store.add_event(AGENT, "playbook_triggered", f"nightly playbook run for {day}",
+                                 ts=self._stamp(), idempotency_key=f"playbook:{day}")
             jobs.append(self._run_playbook)
         return jobs
 

@@ -76,7 +76,7 @@ def test_pack_verdict_case_round_trip(env):
                           "reasons": [{"reason": "b", "voa_record": "2"}]})
     assert store.latest_verdict(cid)["verdict"] == "survive"
 
-    store.insert_case({"case_id": cid, "uarn": ids["uarn"], "stage": "awaiting_owner",
+    store.insert_case({"case_id": cid, "uarn": ids["uarn"], "stage": "waiting_owner",
                        "owner_approved": False, "history": [{"type": "risk", "text": "r"}]})
     store.update_case(cid, {"stage": "check_ready", "owner_approved": True,
                             "next_deadline": "2026-10-20T09:00:00+00:00"})
@@ -91,14 +91,16 @@ def test_pack_verdict_case_round_trip(env):
 def test_events(env):
     store, ids = env
     k, cid = ids["kind"], ids["case_id"]
+    seed(store, ids)          # events link to a case by its uuid, so the pack must exist
     assert store.last_event(k) is None
     store.add_event("orchestrator", k, "one", case_id=cid, tokens=5)
     store.add_event("orchestrator", k, "two", case_id=cid)
     assert store.count_events(k, cid) == 2
     assert store.last_event(k, cid)["message"] == "two"
-    first = store.events_after(k, 0)
+    first = store.events_since(k, None)
     assert [e["message"] for e in first] == ["one", "two"]
-    assert [e["message"] for e in store.events_after(k, first[0]["id"])] == ["two"]
+    assert first[0]["case_id"] == cid            # read back as the readable ref
+    assert [e["message"] for e in store.events_since(k, first[1]["ts"])] == ["two"]
 
 
 def test_pdf_saved(env):

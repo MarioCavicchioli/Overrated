@@ -65,7 +65,7 @@ def run_session(
         budget=budget.platform_budget(model),
     )
     store.add_event(agent_name, "session_started", f"{title or agent_name}: {trace_url(session.id)}",
-                    case_id=case_id)
+                    case_id=case_id, payload={"session_id": session.id})
 
     meter = budget.SpendMeter()
     open_runs: set[str] = set()
@@ -117,7 +117,10 @@ def run_session(
     cents = int(final.usage.list_cost.amount) if final.usage.list_cost else 0
     store.add_event(agent_name, "session_spend",
                     f"{title or agent_name}: {tokens:,} tokens, {cents} cents list cost "
-                    f"({stop_reason})", case_id=case_id, tokens=tokens)
+                    f"({stop_reason})", case_id=case_id, tokens=tokens,
+                    cost_usd=cents / 100, idempotency_key=f"spend:{session.id}",
+                    payload={"session_id": session.id, "stop_reason": stop_reason,
+                             "model": model})
     return SessionResult(session.id, stop_reason, tokens, cents)
 
 

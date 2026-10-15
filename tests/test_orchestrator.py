@@ -49,7 +49,7 @@ def test_new_pack_starts_advocate_and_survive_opens_case(store):
     p.judge("c_0001")
     assert calls == ["c_0001"]
     case = store.get_case("c_0001")
-    assert case["stage"] == "awaiting_owner" and case["owner_approved"] is False
+    assert case["stage"] == "waiting_owner" and case["owner_approved"] is False
     assert {"type": "risk", "text": RISK_LINE}.items() <= case["history"][1].items()
     assert store.get_candidate("1001008")["status"] == "survived"
     assert "case_opened" in kinds(store)
@@ -128,7 +128,7 @@ def test_approve_requires_authority_and_confirmation(api, store):
                  {"account_reference": "4471-2290-11", "facts_confirmed": False}):
         r = api.post("/cases/c_0001/approve", json=body, headers=AUTH)
         assert r.status_code == 422, body
-    assert store.get_case("c_0001")["stage"] == "awaiting_owner"
+    assert store.get_case("c_0001")["stage"] == "waiting_owner"
 
 
 def test_approve_moves_case_to_check_ready(api, store):

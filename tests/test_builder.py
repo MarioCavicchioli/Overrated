@@ -200,15 +200,12 @@ def test_data_results_are_wrapped_as_data(store, data):
 
 
 # -- store matches the contract -----------------------------------------
-def columns(sql: str) -> dict[str, list[str]]:
-    tables = {}
-    for name, body in re.findall(r"create table if not exists (\w+) \((.*?)\n\);", sql, re.S):
-        tables[name] = [line.split()[0] for line in body.strip().splitlines()
-                        if line.strip() and not line.strip().startswith("--")]
-    return tables
-
-
-def test_sqlite_schema_matches_contract():
-    contract = columns((ROOT / "contracts" / "schema.sql").read_text())
-    local = columns((ROOT / "orchestrator" / "sqlite_schema.sql").read_text())
-    assert contract == local
+def test_sqlite_schema_matches_contract(store):
+    """The local SQLite tables are built from contracts/schema.sql, PENDING columns included."""
+    from orchestrator import contract
+    expected = {t: [c.name for c in cols] for t, cols in contract.tables().items()}
+    sql = (ROOT / "contracts" / "schema.sql").read_text()
+    assert set(expected) == set(re.findall(r"create table if not exists (\w+)", sql))
+    assert "case_ref" in expected["packs"] and "pack" in expected["packs"]
+    local = {t: [r[1] for r in store.db.execute(f"pragma table_info({t})")] for t in expected}
+    assert local == expected

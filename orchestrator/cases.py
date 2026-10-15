@@ -40,7 +40,7 @@ def risk_line(case: dict[str, Any]) -> str:
 
 def create_case(store: Store, case_id: str, uarn: str) -> None:
     store.insert_case({
-        "case_id": case_id, "uarn": uarn, "stage": "awaiting_owner", "owner_approved": False,
+        "case_id": case_id, "uarn": uarn, "stage": "waiting_owner", "owner_approved": False,
         "history": [
             {"ts": _now(), "type": "created",
              "text": "Survived the VOA advocate. Waiting for the owner's approval."},
@@ -59,9 +59,9 @@ def approve_case(store: Store, case_id: str, account_reference: str | None,
     case = store.get_case(case_id)
     if case is None:
         raise ApprovalError(404, f"no case {case_id}")
-    if case["owner_approved"] or case["stage"] != "awaiting_owner":
+    if case["owner_approved"] or case["stage"] != "waiting_owner":
         raise ApprovalError(409, f"case {case_id} is at stage {case['stage']}, "
-                                 "not awaiting_owner")
+                                 "not waiting_owner")
     reference = (account_reference or "").strip()
     if not reference:
         raise ApprovalError(422, "proof of ratepayer authority is required: "
@@ -74,8 +74,8 @@ def approve_case(store: Store, case_id: str, account_reference: str | None,
         "text": "Owner confirmed the facts are true and gave the rates bill account "
                 f"reference ({_mask(reference)}). Queued for the Caseworker to file the Check.",
     }]
-    store.update_case(case_id, {"owner_approved": True, "stage": "check_ready",
-                                "history": history})
+    store.update_case(case_id, {"owner_approved": True, "owner_approved_at": _now(),
+                                "stage": "check_ready", "history": history})
     store.add_event(AGENT, "owner_approved",
                     "Owner approved with proof of authority; case ready for the Check",
                     case_id=case_id)

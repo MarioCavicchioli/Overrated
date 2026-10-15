@@ -1,7 +1,7 @@
 """Watches the store and moves cases along.
 
 - A packs row with no verdict starts an advocate session: run_advocate(case_id).
-- A survive verdict creates a cases row at stage awaiting_owner.
+- A survive verdict creates a cases row at stage waiting_owner.
 - A kill verdict sets the candidate to killed, with the reasons in events.
 
 Polling works the same over SQLite and Supabase. Every step is idempotent, so a
