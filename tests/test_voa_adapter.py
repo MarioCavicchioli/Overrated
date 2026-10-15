@@ -115,6 +115,25 @@ def test_neighbour_priced_like_the_subject_is_never_excluded(voa):
     assert any("proposed_rv must be below current_rv" in e for e in check_pack(honest, voa))
 
 
+def test_no_case_when_segment_mad_is_zero(voa):
+    """TWIN STREET, like Seven Sisters Road c_0101: five shops, MAD 0, spread = 5% floor."""
+    tone = voa.street_tone("TWIN STREET|N4 1#SCH5")
+    assert tone["mad"] == 0 and tone["spread"] == pytest.approx(0.05 * tone["median_zone_a"])
+    errors = check_pack(build_pack(voa, "900000201"), voa)
+    assert any("MAD 0 over 5 shops" in e and "call no_case" in e for e in errors)
+
+
+def test_no_case_when_the_lower_price_is_only_another_buildings(voa):
+    """PAIR STREET: a real spread (MAD 15), but every cheaper comparable is in the next
+    postcode while the subject's twin in its own postcode is at the same £300."""
+    assert voa.street_tone("PAIR STREET|N5 1#SCH6")["mad"] == 15
+    pack = build_pack(voa, "900000301")
+    assert pack["proposed_rv"] < pack["current_rv"]           # the numbers alone would pass
+    errors = check_pack(pack, voa)
+    assert any("different postcode" in e and "900000302" in e for e in errors)
+    assert not any("MAD 0" in e for e in errors)
+
+
 def test_unknown_uarn_and_bad_key(voa):
     with pytest.raises(NotFound):
         voa.get_valuation("123")
@@ -125,7 +144,8 @@ def test_unknown_uarn_and_bad_key(voa):
 
 def test_search_filters_use(voa):
     rows = voa.search_properties(street="TEST STREET", use="shop and premises")
-    assert rows and all(r["use"] == "SHOP AND PREMISES" for r in rows)
+    assert rows and all("SHOP AND PREMISES" in r["use"] for r in rows)   # contains, case-blind
+    assert "900000003" not in {r["uarn"] for r in rows}                  # plain "SHOP" left out
 
 
 def test_backend_setting(monkeypatch):

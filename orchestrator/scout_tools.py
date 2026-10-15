@@ -3,7 +3,7 @@
 Builders run inside the Scout's workflow runs, so their custom tool calls arrive
 on the Scout's session stream. Route every custom tool call through this:
 
-    router = ScoutToolRouter(store, data)
+    router = ScoutToolRouter(store, data, run_id=scout_run_id)
     router.register("save_candidates", my_scout_handler)   # the Scout's own tools
     run_session(client, store, agent="scout", ..., handle=router, run_id=scout_run_id)
 
@@ -26,8 +26,10 @@ from orchestrator.store import Store
 
 
 class ScoutToolRouter:
-    def __init__(self, store: Store, data: DataClient):
-        self.builder = BuilderHandlers(store, data)
+    def __init__(self, store: Store, data: DataClient, run_id: str | None = None):
+        """run_id: the Scout's scout_runs row for this session. Packs are written
+        against that run's candidate row."""
+        self.builder = BuilderHandlers(store, data, run_id)
         self.extra: dict[str, ToolHandler] = {}
 
     def register(self, name: str, handler: ToolHandler) -> None:

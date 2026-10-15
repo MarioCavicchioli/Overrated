@@ -16,6 +16,8 @@ STREET = "TEST STREET|E8 1"
 SEGMENT = STREET + "#SCH1"
 OTHER_SEGMENT = STREET + "#SCH2"
 BLOCK = "BLOCK STREET|EC1 9#SCH9"
+TWIN = "TWIN STREET|N4 1#SCH5"      # like Seven Sisters Road c_0101: MAD 0, two buildings
+PAIR = "PAIR STREET|N5 1#SCH6"      # two buildings priced apart, but a real spread
 
 # uarn: (zone_a_price, zone A / B / C areas, total_area, postcode, segment, desc_text)
 SHOPS = {
@@ -41,10 +43,27 @@ SHOPS = {
     900000110: (760, (24, 11, 0), 39, "EC1 9AB", BLOCK, "SHOP AND PREMISES"),
     900000111: (780, (24, 12, 0), 40, "EC1 9AB", BLOCK, "SHOP AND PREMISES"),
     900000112: (800, (23, 13, 0), 40, "EC1 9AB", BLOCK, "SHOP AND PREMISES"),
+    # TWIN STREET: subject and its twin at £290 in one building, three at £245 in the
+    # next building 42 m away. Five shops, MAD 0, spread = the 5% floor.
+    900000201: (290, (32, 26, 0), 60, "N4 1AA", TWIN, "SHOP AND PREMISES"),        # subject
+    900000202: (290, (40, 30, 0), 73, "N4 1AA", TWIN, "SHOP AND PREMISES"),
+    900000203: (245, (31, 25, 0), 58, "N4 1FS", TWIN, "SHOP AND PREMISES"),
+    900000204: (245, (33, 26, 0), 61, "N4 1FS", TWIN, "SHOP AND PREMISES (DABW)"),
+    900000205: (245, (30, 27, 0), 59, "N4 1FS", TWIN, "SHOP AND PREMISES (DABW)"),
+    # PAIR STREET: subject and twin at £300 in one postcode, cheaper shops in the
+    # next postcode 50 m away, more shops 400 m off. MAD 15, so the spread is real.
+    900000301: (300, (30, 20, 0), 52, "N5 1AA", PAIR, "SHOP AND PREMISES"),        # subject
+    900000302: (300, (31, 20, 0), 53, "N5 1AA", PAIR, "SHOP AND PREMISES"),
+    900000303: (240, (30, 21, 0), 52, "N5 1FS", PAIR, "SHOP AND PREMISES"),
+    900000304: (250, (29, 20, 0), 50, "N5 1FS", PAIR, "SHOP AND PREMISES"),
+    900000305: (255, (30, 20, 0), 52, "N5 1FS", PAIR, "SHOP AND PREMISES"),
+    900000306: (270, (30, 20, 0), 52, "N5 1ZZ", PAIR, "SHOP AND PREMISES"),
+    900000307: (230, (30, 20, 0), 52, "N5 1ZZ", PAIR, "SHOP AND PREMISES"),
 }
 # Distance from each postcode centre to the subject's (same postcode = 0 m).
 DISTANCE = {"E8 1AA": 0, "E8 1AB": 60, "E8 1AC": 140, "E8 1AD": 90, "E8 9ZZ": None,
-            "EC1 9AA": 0, "EC1 9AB": 150}
+            "EC1 9AA": 0, "EC1 9AB": 150, "N4 1AA": 0, "N4 1FS": 42,
+            "N5 1AA": 0, "N5 1FS": 50, "N5 1ZZ": 400}
 LINES = ("Retail Zone A", "Retail Zone B", "Retail Zone C")
 FRACTION = (1, 0.5, 0.25)
 
@@ -134,7 +153,7 @@ def main() -> None:
     responses = {f"/get_valuation/{u}": valuation(u) for u in SHOPS}
     responses.update({f"/comparables/{u}": comparables(u) for u in SHOPS})
     responses.update({f"/street_tone?segment_key={seg}": street_tone(seg)
-                      for seg in (SEGMENT, OTHER_SEGMENT, BLOCK)})
+                      for seg in (SEGMENT, OTHER_SEGMENT, BLOCK, TWIN, PAIR)})
     responses["/search_properties?q=TEST STREET"] = [
         {"uarn": u, "address": shop(u)["address"], "postcode": shop(u)["postcode"],
          "street_key": STREET, "use": SHOPS[u][5], "scat_code": "249", "rv": shop(u)["rv"],

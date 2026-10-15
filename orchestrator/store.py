@@ -83,8 +83,8 @@ def new_id() -> str:
 
 class Store(Protocol):
     def upsert_candidate(self, row: dict[str, Any]) -> None: ...
-    def get_candidate(self, uarn: str) -> dict[str, Any] | None: ...
-    def set_candidate_status(self, uarn: str, status: str) -> None: ...
+    def get_candidate(self, uarn: str, run_id: str | None = None) -> dict[str, Any] | None: ...
+    def set_candidate_status(self, uarn: str, status: str, run_id: str | None = None) -> None: ...
     def list_candidates(self, status: str) -> list[dict[str, Any]]: ...
     def has_pack(self, uarn: str) -> bool: ...
     def next_case_id(self) -> str: ...
@@ -190,13 +190,18 @@ class BaseStore:
             **row,
         })
 
-    def get_candidate(self, uarn: str) -> dict[str, Any] | None:
-        return self._one("candidates", [("uarn", "eq", uarn)], [("created_at", True)])
+    def get_candidate(self, uarn: str, run_id: str | None = None) -> dict[str, Any] | None:
+        """The candidate row for a property: in run_id's run when given (a UARN can be a
+        candidate in several runs), otherwise the latest."""
+        where: Where = [("uarn", "eq", uarn)]
+        if run_id:
+            where.append(("run_id", "eq", run_id))
+        return self._one("candidates", where, [("created_at", True)])
 
-    def set_candidate_status(self, uarn: str, status: str) -> None:
+    def set_candidate_status(self, uarn: str, status: str, run_id: str | None = None) -> None:
         if status not in CANDIDATE_STATUSES:
             raise ValueError(f"unknown candidate status {status!r}")
-        cand = self.get_candidate(uarn)
+        cand = self.get_candidate(uarn, run_id)
         if cand:
             self._update("candidates", {"status": status, "updated_at": now_iso()},
                          [("candidate_id", "eq", cand["candidate_id"])])
@@ -225,7 +230,7 @@ class BaseStore:
 
     def insert_pack(self, row: dict[str, Any]) -> None:
         ref, pack = row["case_id"], row["pack"]
-        cand = self.get_candidate(row["uarn"])
+        cand = self.get_candidate(row["uarn"], row.get("run_id"))
         if cand is None:
             raise ValueError(f"no candidate for {row['uarn']}")
         refs = [{"type": "voa_record", "uarn": row["uarn"], "role": "subject"}] + [
