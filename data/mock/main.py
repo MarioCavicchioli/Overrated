@@ -250,9 +250,14 @@ def _summary(p: dict) -> dict:
         "postcode": p["postcode"],
         "street_key": p["street_key"],
         "use": p["use"],
+        "use_class": p["use"],   # the real service compares VOA scheme codes; the mock, uses
         "zone_a_price": p["zone_a_price"],
         "rv": p["rv"],
     }
+
+
+def _itza(p: dict) -> float:
+    return sum(z["area_m2"] * ZONE_MULT[z["zone"]] for z in p["zones"])
 
 
 def _full_valuation(p: dict) -> dict:
@@ -266,7 +271,15 @@ def _full_valuation(p: dict) -> dict:
     return {
         **_summary(p),
         "zones": zones_detail,
+        "itza": round(_itza(p), 2),
+        # the real service takes this from the summary valuation's total area
+        "floor_area_m2": sum(z["area_m2"] for z in p["zones"]),
     }
+
+
+def tone_spread(mad: float, median: float) -> float:
+    """The team's spread (Person 1's data service): 1.4826 x MAD, at least 5% of the median."""
+    return max(1.4826 * mad, 0.05 * median)
 
 
 # ── endpoints ──────────────────────────────────────────────────
@@ -333,7 +346,8 @@ def street_tone(street_key: str):
         "count": len(props),
         "median_zone_a": round(med, 2),
         "mean_zone_a": round(statistics.mean(prices), 2),
-        "spread_mad": round(mad, 2),
+        "mad": round(mad, 2),
+        "spread": round(tone_spread(mad, med), 2),
         "uses": _use_counts(props),
     }
 

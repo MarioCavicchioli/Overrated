@@ -120,3 +120,16 @@ def test_next_case_id_sqlite(tmp_path):
     assert store.next_case_id() == "c_0001"
     seed(store, {"uarn": "U1", "case_id": "c_0041"})
     assert store.next_case_id() == "c_0042"
+
+
+def test_case_refs_start_at_101_live(tmp_path, monkeypatch):
+    """Live refs start at c_0101; refs below the start (Person 1's c_0001-c_0008) are ignored."""
+    store = SQLiteStore(tmp_path / "t.db", tmp_path / "pdfs")
+    monkeypatch.setattr(store, "CASE_REF_START", 101)
+    assert store.next_case_id() == "c_0101"
+    seed(store, {"uarn": "U1", "case_id": "c_0007"})
+    assert store.next_case_id() == "c_0101"
+    seed(store, {"uarn": "U2", "case_id": "c_0101"})
+    assert store.next_case_id() == "c_0102"
+    from orchestrator.supabase_store import SupabaseStore
+    assert SupabaseStore.CASE_REF_START == 101

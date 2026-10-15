@@ -24,22 +24,36 @@ COMP_MAX_DISTANCE_M = float(os.getenv("COMP_MAX_DISTANCE_M", "200"))
 SIZE_RATIO_MIN, SIZE_RATIO_MAX = 0.5, 2.0   # comparable floor area vs the subject's
 MAX_COMPARABLES = 6
 EXCLUDE_BEYOND_SPREADS = 2.0                 # an eligible comparable may be left out only past this
+MAX_EXCLUSIONS = 1                           # and at most one: a block priced like the subject
+                                             # (e.g. 221-233 Old Street) can't be excluded away
+SUBJECT_TWIN_SPREADS = 1.0                   # never one within this of the subject's own price
 PRICE_TOL = 0.5                              # GBP/m2, for rounding
 DISTANCE_TOL_M = 0.5
 
 
 def itza(valuation: dict) -> float:
-    """Area 'in terms of Zone A': each zone's area at its fraction of the Zone A price."""
+    """Area 'in terms of Zone A'. The data service's figure when it gives one;
+    otherwise each zone's area at its fraction of the Zone A price."""
+    if valuation.get("itza"):
+        return float(valuation["itza"])
     za = valuation["zone_a_price"]
     return sum(z["area_m2"] * z["price_per_m2"] / za for z in valuation["zones"])
 
 
 def floor_area(valuation: dict) -> float:
-    return sum(z["area_m2"] for z in valuation["zones"])
+    """Floor area from the summary valuation (total area); the zones' sum as a fallback."""
+    return float(valuation.get("floor_area_m2") or sum(z["area_m2"] for z in valuation["zones"]))
+
+
+def same_use(a: dict, b: dict) -> bool:
+    """Same use = same use_class (the VOA scheme code for real data)."""
+    return (a.get("use_class") or a["use"]) == (b.get("use_class") or b["use"])
 
 
 def spreads_from_median(zone_a_price: float, tone: dict) -> float:
-    spread = tone["spread_mad"] or 1
+    """How many spreads from the street median. spread = 1.4826 x MAD, at least
+    5% of the median (Person 1's definition, used by the Scout, builder and advocate)."""
+    spread = tone["spread"] or 1
     return (zone_a_price - tone["median_zone_a"]) / spread
 
 
@@ -48,10 +62,15 @@ def eligible_comparables(uarn: str, data: DataClient) -> list[dict]:
     street segment within COMP_MAX_DISTANCE_M, with floor area between half and
     double the subject's, nearest first, at most MAX_COMPARABLES.
 
-    Each entry carries spreads_from_median and whether it may be excluded.
+    Each entry carries spreads_from_median, spreads_from_subject and whether it
+    may be excluded: only when it is more than EXCLUDE_BEYOND_SPREADS from the
+    street median AND more than SUBJECT_TWIN_SPREADS from the subject's own price.
+    A neighbour priced like the subject is the best evidence of how the VOA prices
+    that spot, so it is never left out.
     """
     subject = data.get_valuation(uarn)
     tone = data.street_tone(subject["street_key"])
+    spread = tone["spread"] or 1
     out = []
     for c in data.comparables(uarn, max_distance=COMP_MAX_DISTANCE_M, same_use=True, limit=200):
         record = data.get_valuation(c["uarn"])
@@ -59,11 +78,14 @@ def eligible_comparables(uarn: str, data: DataClient) -> list[dict]:
         if not SIZE_RATIO_MIN <= ratio <= SIZE_RATIO_MAX:
             continue
         spreads = spreads_from_median(c["zone_a_price"], tone)
+        from_subject = (c["zone_a_price"] - subject["zone_a_price"]) / spread
         out.append({"uarn": c["uarn"], "zone_a_price": c["zone_a_price"],
                     "distance_m": c["distance_m"], "use": c["use"],
                     "floor_area_ratio": round(ratio, 2),
                     "spreads_from_median": round(spreads, 2),
-                    "may_exclude": abs(spreads) > EXCLUDE_BEYOND_SPREADS})
+                    "spreads_from_subject": round(from_subject, 2),
+                    "may_exclude": abs(spreads) > EXCLUDE_BEYOND_SPREADS
+                    and abs(from_subject) > SUBJECT_TWIN_SPREADS})
         if len(out) == MAX_COMPARABLES:
             break
     return out
@@ -97,9 +119,9 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
     if abs(pack["calc"]["street_median"] - tone["median_zone_a"]) > PRICE_TOL:
         errors.append(f"calc.street_median is {pack['calc']['street_median']}, "
                       f"street_tone says {tone['median_zone_a']}")
-    if abs(pack["calc"]["street_spread"] - tone["spread_mad"]) > PRICE_TOL:
+    if abs(pack["calc"]["street_spread"] - tone["spread"]) > PRICE_TOL:
         errors.append(f"calc.street_spread is {pack['calc']['street_spread']}, "
-                      f"street_tone says {tone['spread_mad']}")
+                      f"street_tone says {tone['spread']}")
 
     # Everything on the subject's street segment, any use, as the data service sees it.
     pool = {c["uarn"]: c for c in data.comparables(
@@ -126,7 +148,7 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
             errors.append(f"{tag}: not on the subject's street segment "
                           f"(within {COMP_MAX_DISTANCE_M:.0f} m)")
             continue
-        if record["use"] != subject["use"]:
+        if not same_use(record, subject):
             errors.append(f"{tag}: use is {record['use']!r}, subject is {subject['use']!r}; "
                           "only same-use comparables are allowed")
         if comp["use"] != record["use"]:
@@ -145,6 +167,10 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
     # one out only if it is more than EXCLUDE_BEYOND_SPREADS from the street median.
     eligible = {c["uarn"]: c for c in eligible_comparables(pack["uarn"], data)}
     excluded: dict[str, dict] = {}
+    if len(pack.get("exclusions", [])) > MAX_EXCLUSIONS:
+        errors.append(f"exclusions: {len(pack['exclusions'])} listed; a pack may leave out at most "
+                      f"{MAX_EXCLUSIONS} eligible comparable. If the neighbours you'd leave out are "
+                      "priced like the candidate, there is no clear case: call no_case")
     for i, ex in enumerate(pack.get("exclusions", [])):
         tag = f"exclusions[{i}] {ex['uarn']}"
         if ex["uarn"] in seen or ex["uarn"] in excluded:
@@ -156,8 +182,14 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
             errors.append(f"{tag}: not an eligible comparable, so it needs no exclusion")
             continue
         if not e["may_exclude"]:
-            errors.append(f"{tag}: is {e['spreads_from_median']} spreads from the street median; "
-                          f"only beyond {EXCLUDE_BEYOND_SPREADS:g} may be excluded, so use it")
+            if abs(e["spreads_from_median"]) <= EXCLUDE_BEYOND_SPREADS:
+                errors.append(f"{tag}: is {e['spreads_from_median']} spreads from the street "
+                              f"median; only beyond {EXCLUDE_BEYOND_SPREADS:g} may be excluded, "
+                              "so use it")
+            else:
+                errors.append(f"{tag}: is within {SUBJECT_TWIN_SPREADS:g} spread of the "
+                              f"candidate's own price ({e['spreads_from_subject']} spreads); a "
+                              "neighbour priced like the candidate can never be excluded, so use it")
         if abs(ex["zone_a_price"] - e["zone_a_price"]) > PRICE_TOL:
             errors.append(f"{tag}: zone_a_price should be {e['zone_a_price']}")
         if abs(ex["distance_m"] - e["distance_m"]) > DISTANCE_TOL_M:
@@ -184,7 +216,7 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
                           f"the comparables' range £{lo}-£{hi}; proposed_rv = ITZA "
                           f"({itza(subject):.2f} m2) x the Zone A price you argue for")
 
-    expected = rates.annual_saving(subject["rv"], pack["proposed_rv"], subject["use"])
+    expected = rates.annual_saving(subject["rv"], pack["proposed_rv"], rates.use_of(subject))
     if pack["proposed_rv"] < subject["rv"] and pack["annual_saving"] != expected:
         errors.append(f"annual_saving should be {expected} "
                       f"(bill at current_rv minus bill at proposed_rv, 2026 multipliers)")

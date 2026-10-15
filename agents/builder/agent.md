@@ -50,8 +50,8 @@ tools:
   - type: custom
     name: street_tone
     description: >-
-      Zone A price statistics for a street segment: median_zone_a, spread_mad (median
-      absolute deviation), mean, count and uses.
+      Zone A price statistics for a street segment: median_zone_a, spread (1.4826 x the
+      median absolute deviation, at least 5% of the median), mad, mean and count.
     input_schema:
       type: object
       properties:
@@ -63,8 +63,9 @@ tools:
     description: >-
       The comparables your pack must account for: every same-use property within 200 m
       on the candidate's street segment with floor area between half and double the
-      candidate's, nearest first, at most 6. Each has spreads_from_median and
-      may_exclude (true only when more than 2 spreads from the street median).
+      candidate's, nearest first, at most 6. Each has spreads_from_median,
+      spreads_from_subject and may_exclude (true only when more than 2 spreads from
+      the street median and more than 1 spread from the candidate's own price).
     input_schema:
       type: object
       properties:
@@ -100,8 +101,8 @@ tools:
             additionalProperties: false
         exclusions:
           type: array
-          description: "eligible comparables you left out; only those with may_exclude true"
-          maxItems: 6
+          description: "the eligible comparable you left out, if any: at most one, with may_exclude true"
+          maxItems: 1
           items:
             type: object
             properties:
@@ -116,7 +117,7 @@ tools:
           properties:
             zone_a_price: {type: number, description: "the subject's current Zone A price"}
             street_median: {type: number, description: "median_zone_a from street_tone"}
-            street_spread: {type: number, description: "spread_mad from street_tone"}
+            street_spread: {type: number, description: "spread from street_tone"}
           required: [zone_a_price, street_median, street_spread]
           additionalProperties: false
         argument: {type: string, minLength: 50}
@@ -145,7 +146,7 @@ How shops are valued. A shop is split into zones from the front window: Zone A i
 How to work:
 1. get_valuation for the candidate. Note its use, zones and Zone A price.
 2. street_tone for its street_key. Compare the candidate's Zone A price with the median and spread.
-3. eligible_comparables for the candidate. Your pack must use every one of them. You may leave one out only if its may_exclude is true (more than 2 spreads from the street median); list each one you leave out in exclusions with its reason. Never pick and choose among the others.
+3. eligible_comparables for the candidate. Your pack must use every one of them. You may leave out at most one, and only one whose may_exclude is true (more than 2 spreads from the street median and more than 1 spread from the candidate's own price); list it in exclusions with its reason. A neighbour priced like the candidate is never left out: it is the best evidence of how that spot is valued. Never pick and choose among the others. If several neighbours are priced like the candidate, the street is priced that way on purpose: call no_case.
 4. Pick the Zone A price you argue for: the median of the Zone A prices of the comparables you use. proposed_rv = round(candidate ITZA x that price). It must be below current_rv.
 5. Write the argument for the property owner in plain English, in 120 to 250 words: what the candidate is valued at, what similar shops nearby are valued at (cite their UARNs, prices and distances), any comparable you left out and why, and the proposed value and how you got it. Do not state the annual saving: code computes it and the pack shows it. No legal jargon, no promises of an outcome.
 6. Call submit_pack. If it is rejected, fix every problem listed and resubmit.

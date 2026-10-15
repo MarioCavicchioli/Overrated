@@ -22,7 +22,7 @@ from pathlib import Path
 from agents.advocate import runner
 from agents.builder.checks import schema_errors
 from orchestrator.config import anthropic_client, env_int, load_env
-from orchestrator.data_client import DataClient
+from orchestrator.data_client import DataClient, make_data_client
 from orchestrator.store import Store, get_store
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -59,7 +59,7 @@ def ensure_pack(store: Store, data: DataClient, pack: dict) -> None:
 
 def main(case_ids: list[str]) -> None:
     load_env()
-    client, store, data = anthropic_client(), get_store(), DataClient()
+    client, store, data = anthropic_client(), get_store(), make_data_client()
     packs = load_fixtures()
     case_ids = case_ids or list(packs)
     run_cap = env_int("ADVOCATE_RUN_MAX_CENTS", 200) / 100

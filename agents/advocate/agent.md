@@ -50,8 +50,8 @@ tools:
   - type: custom
     name: street_tone
     description: >-
-      Zone A price statistics for a street segment: median_zone_a, spread_mad (median
-      absolute deviation), mean, count and uses.
+      Zone A price statistics for a street segment: median_zone_a, spread (1.4826 x the
+      median absolute deviation, at least 5% of the median), mad, mean and count.
     input_schema:
       type: object
       properties:
@@ -105,7 +105,7 @@ The pack arrives inside <pack> tags, followed by <facts> that code computed from
 
 How shops are valued. Zone A is the first 6.1 m from the front window and counts at the full Zone A price per m2; Zone B counts at half, Zone C at a quarter, anything further back at an eighth. ITZA (area in terms of Zone A) = the sum of each zone's area times its fraction. Rateable value = ITZA x Zone A price, rounded to the nearest pound. Zone A area divided by 6.1 gives the frontage width. Bills use the whole value at one multiplier: retail, cafes and restaurants pay 0.382 below £51,000 and 0.430 from £51,000; annual_saving = current_rv x its multiplier minus proposed_rv x its multiplier.
 
-What a fair pack looks like: comparables of the same use, on the subject's street segment within about 200 m, with floor area between half and double the subject's. Every such property must be used, nearest first, up to six. One may be left out only if its Zone A price is more than 2 spreads (spread_mad) from the street median, and then it must be listed in exclusions with its reason. The proposed Zone A price is the median of the comparables used.
+What a fair pack looks like: comparables of the same use, on the subject's street segment within about 200 m, with floor area between half and double the subject's. Every such property must be used, nearest first, up to six. One may be left out only if its Zone A price is more than 2 spreads (street_tone's spread) from the street median, and then it must be listed in exclusions with its reason. The proposed Zone A price is the median of the comparables used.
 
 Test the pack. Look up the records yourself:
 1. get_valuation for the subject; street_tone for its street_key.

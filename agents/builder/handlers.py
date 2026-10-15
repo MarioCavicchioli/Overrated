@@ -118,7 +118,7 @@ class BuilderHandlers:
             subject = self.data.get_valuation(uarn)
         except NotFound:
             return 0
-        return max(0, rates.annual_saving(subject["rv"], proposed_rv, subject["use"]))
+        return max(0, rates.annual_saving(subject["rv"], proposed_rv, rates.use_of(subject)))
 
     # -- no_case ---------------------------------------------------------
     def _no_case(self, args: dict[str, Any]) -> str:

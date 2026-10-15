@@ -1,5 +1,9 @@
 """Watches the store and moves cases along.
 
+- A customer request starts a standalone builder session (outside the Scout):
+  a candidate with status building_pack, "customer_request" in its flags and no
+  pack yet -> run_builder(uarn). The Scout also marks its own batches
+  building_pack, but without that flag, so they're never built twice.
 - A packs row with no verdict starts an advocate session: run_advocate(case_id).
 - A survive verdict creates a cases row at stage waiting_owner.
 - A kill verdict sets the candidate to killed, with the reasons in events.
@@ -22,21 +26,74 @@ from orchestrator.store import Store
 
 log = logging.getLogger(__name__)
 AGENT = "orchestrator"
+CUSTOMER_FLAG = "customer_request"
+
+
+def _default_run_builder(uarn: str) -> str:
+    from agents.builder.runner import run_builder
+    return run_builder(uarn)
 
 
 class Pipeline:
     def __init__(self, store: Store,
                  run_advocate: Callable[[str], None] | None = None,
                  advocate_available: bool | None = None,
-                 max_attempts: int = 3, max_concurrent: int | None = None):
+                 max_attempts: int = 3, max_concurrent: int | None = None,
+                 run_builder: Callable[[str], str] | None = None,
+                 max_concurrent_builds: int | None = None):
         self.store = store
         self.run_advocate = run_advocate or advocate_port.run_advocate
+        self.run_builder = run_builder or _default_run_builder
         self.available = (advocate_port.ADVOCATE_AVAILABLE if advocate_available is None
                            else advocate_available)
         self.max_attempts = max_attempts
         self.max_concurrent = max_concurrent or env_int("MAX_CONCURRENT_ADVOCATES", 4)
+        self.max_builds = max_concurrent_builds or env_int("MAX_CONCURRENT_BUILDERS", 2)
         self.in_flight: set[str] = set()
+        self.building: set[str] = set()
         self.lock = threading.Lock()
+
+    # -- customer requests -> builder ----------------------------------------
+    def candidates_to_build(self) -> list[dict]:
+        out = []
+        for cand in self.store.list_candidates("building_pack"):
+            if CUSTOMER_FLAG not in (cand.get("flags") or []):
+                continue                       # a Scout batch: its own builders handle it
+            with self.lock:
+                if cand["uarn"] in self.building:
+                    continue
+            if self.store.has_pack(cand["uarn"]):
+                continue
+            if self.store.count_candidate_events("builder_started",
+                                                 cand["candidate_id"]) >= self.max_attempts:
+                continue
+            out.append(cand)
+        return out
+
+    def build(self, uarn: str, candidate_id: str) -> None:
+        """Run one standalone builder session for a customer request. Blocking."""
+        self.store.add_event(AGENT, "builder_started",
+                             f"Customer request {uarn}: starting the Case builder",
+                             candidate_id=candidate_id)
+        try:
+            outcome = self.run_builder(uarn)
+            self.store.add_event(AGENT, "builder_finished", f"Customer request {uarn}: {outcome}",
+                                 candidate_id=candidate_id)
+        except Exception as e:
+            log.exception("builder failed on %s", uarn)
+            self.store.add_event(AGENT, "builder_failed", f"Builder failed: {type(e).__name__}",
+                                 candidate_id=candidate_id)
+
+    def tick_builds(self) -> list[dict]:
+        """Customer requests to start builders on now (marked in flight)."""
+        started = []
+        for cand in self.candidates_to_build():
+            with self.lock:
+                if len(self.building) >= self.max_builds:
+                    break
+                self.building.add(cand["uarn"])
+            started.append(cand)
+        return started
 
     # -- packs -> advocate -------------------------------------------------
     def packs_to_judge(self) -> list[str]:
@@ -118,11 +175,20 @@ class Pipeline:
         interval_s = interval_s or env_int("WATCH_INTERVAL_S", 5)
         while True:
             try:
+                for cand in self.tick_builds():
+                    asyncio.create_task(self._build_async(cand["uarn"], cand["candidate_id"]))
                 for case_id in self.tick():
                     asyncio.create_task(self._judge_async(case_id))
             except Exception:
                 log.exception("watch tick failed")
             await asyncio.sleep(interval_s)
+
+    async def _build_async(self, uarn: str, candidate_id: str) -> None:
+        try:
+            await asyncio.to_thread(self.build, uarn, candidate_id)
+        finally:
+            with self.lock:
+                self.building.discard(uarn)
 
     async def _judge_async(self, case_id: str) -> None:
         try:

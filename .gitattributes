@@ -1,0 +1,7 @@
+# Managed Agents definitions are uploaded byte for byte by `ant apply`. Keep them
+# LF on every machine, so Windows checkouts (core.autocrlf=true) don't put carriage
+# returns into agent prompts and tool descriptions.
+agents/**/*.md      text eol=lf
+agents/**/*.yaml    text eol=lf
+agents/**/*.json    text eol=lf
+claude-lock.json    text eol=lf
