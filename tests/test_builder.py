@@ -6,6 +6,8 @@ import json
 import re
 import statistics
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 import pytest
 from fastapi.testclient import TestClient
@@ -168,7 +170,8 @@ def test_submit_writes_pack_pdf_and_events(store, data):
     row = store.get_pack("c_0001")
     assert row["pack"]["case_id"] == "c_0001" and row["version"] == "builder-v1"
     assert row["annual_saving"] == row["pack"]["annual_saving"] == expected_saving
-    assert Path(row["pdf_url"].removeprefix("file:///")).exists()
+    # file:///C:/x on Windows, file:///private/x on macOS: parse it rather than strip a prefix
+    assert Path(url2pathname(urlparse(row["pdf_url"]).path)).exists()
     assert store.get_candidate("1001008")["status"] == "pack_ready"
     assert [e["kind"] for e in store.list_events()] == ["pack_written"]
 

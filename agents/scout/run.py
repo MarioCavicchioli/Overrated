@@ -131,15 +131,16 @@ def kickoff(ba_code, name, run_id, handoff_limit):
     return "\n".join(lines)
 
 
-def builder_router():
-    """Person 2's router for the Case builder's custom tools (real data service, Supabase store)."""
+def builder_router(run_id):
+    """Person 2's router for the Case builder's custom tools (real data service, Supabase store).
+    run_id ties the packs it writes to this Scout run."""
     os.environ.setdefault("DATA_BACKEND", "http")
     os.environ.setdefault("STORE_BACKEND", "supabase")
     from orchestrator.data_client import make_data_client
     from orchestrator.scout_tools import ScoutToolRouter
     from orchestrator.store import get_store
     store = get_store()
-    return store, ScoutToolRouter(store, make_data_client())
+    return store, ScoutToolRouter(store, make_data_client(), run_id=run_id)
 
 
 def main():
@@ -156,12 +157,11 @@ def main():
     workspace = args.workspace or ("overrated" if os.environ.get("OVERRATED_API_KEY") else "legacy")
     ids = resource_ids(workspace)
     client = anthropic_client(workspace)
-    store, router = builder_router()
-    # Person 2's own answer function, so the reply payload is identical to their orchestrator's.
-    from orchestrator.sessions import _answer_tool
-
     cents = budget_cents()
     run_id = start_run(args.ba_code, args.name)
+    store, router = builder_router(run_id)
+    # Person 2's own answer function, so the reply payload is identical to their orchestrator's.
+    from orchestrator.sessions import _answer_tool
     session = client.beta.sessions.create(
         agent=ids["SCOUT_AGENT_ID"],
         environment_id=ids["SCOUT_ENV_ID"],
