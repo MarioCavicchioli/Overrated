@@ -92,6 +92,7 @@ class Store(Protocol):
     def get_pack(self, case_id: str) -> dict[str, Any] | None: ...
     def set_pack_status(self, case_id: str, status: str) -> None: ...
     def list_case_ids(self) -> list[str]: ...
+    def is_ours(self, ref: str | None) -> bool: ...
     def save_pdf(self, case_id: str, data: bytes) -> str: ...
     def insert_verdict(self, row: dict[str, Any]) -> None: ...
     def latest_verdict(self, case_id: str) -> dict[str, Any] | None: ...
@@ -219,8 +220,17 @@ class BaseStore:
     # Our case refs start here. Live: c_0101, because Person 1's app uses c_0001-c_0008.
     CASE_REF_START = 1
 
+    def case_ref_start(self) -> int:
+        return int(os.getenv("CASE_REF_START") or self.CASE_REF_START)
+
+    def is_ours(self, ref: str | None) -> bool:
+        """A case ref in our range (c_0101 and up live). The watcher and the schedules
+        act only on these, never on another team member's c_0001-c_0008."""
+        return bool(ref) and ref.startswith("c_") and ref[2:].isdigit() \
+            and int(ref[2:]) >= self.case_ref_start()
+
     def next_case_id(self) -> str:
-        start = int(os.getenv("CASE_REF_START") or self.CASE_REF_START)
+        start = self.case_ref_start()
         n = start - 1
         for row in self._select("packs"):
             ref = row.get("case_ref") or ""

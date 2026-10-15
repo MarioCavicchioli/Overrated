@@ -53,6 +53,10 @@ class Pipeline:
         self.building: set[str] = set()
         self.lock = threading.Lock()
 
+    def our_case_ids(self) -> list[str]:
+        """Packs in our case ref range only (c_0101 and up live); others are left alone."""
+        return [ref for ref in self.store.list_case_ids() if self.store.is_ours(ref)]
+
     # -- customer requests -> builder ----------------------------------------
     def candidates_to_build(self) -> list[dict]:
         out = []
@@ -98,7 +102,7 @@ class Pipeline:
     # -- packs -> advocate -------------------------------------------------
     def packs_to_judge(self) -> list[str]:
         out = []
-        for case_id in self.store.list_case_ids():
+        for case_id in self.our_case_ids():
             if self.store.latest_verdict(case_id) is not None:
                 continue
             with self.lock:
@@ -133,7 +137,7 @@ class Pipeline:
 
     # -- verdicts -> cases / killed ----------------------------------------
     def apply_verdicts(self) -> None:
-        for case_id in self.store.list_case_ids():
+        for case_id in self.our_case_ids():
             verdict = self.store.latest_verdict(case_id)
             if verdict is None:
                 continue

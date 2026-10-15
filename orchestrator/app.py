@@ -32,8 +32,9 @@ async def lifespan(app: FastAPI):
     app.state.scheduler = Scheduler(app.state.store)
     tasks = []
     if os.getenv("WATCH_DISABLED") != "1":
-        tasks = [asyncio.create_task(app.state.pipeline.watch()),
-                 asyncio.create_task(app.state.scheduler.watch())]
+        tasks.append(asyncio.create_task(app.state.pipeline.watch()))
+    if os.getenv("WATCH_DISABLED") != "1" and os.getenv("SCHEDULES_DISABLED") != "1":
+        tasks.append(asyncio.create_task(app.state.scheduler.watch()))
     yield
     for task in tasks:
         task.cancel()

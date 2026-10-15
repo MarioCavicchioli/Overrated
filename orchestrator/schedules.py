@@ -100,13 +100,15 @@ class Scheduler:
         for ev in self.store.events_since("voa_reply", self.cursor_ts):
             if ev["ts"] == self.cursor_ts and ev["id"] in self.cursor_ids:
                 continue
-            case = self.store.get_case(ev["case_id"]) if ev.get("case_id") else None
+            ours = ev.get("case_id") and self.store.is_ours(ev["case_id"])
+            case = self.store.get_case(ev["case_id"]) if ours else None
             if case and case["stage"] not in FINISHED_STAGES:
                 due.setdefault(ev["case_id"], ("voa_reply", "VOA replied",
                                                {"reply_event_id": ev["id"], "reply_ts": ev["ts"]}))
             self.seen_replies.append((ev["ts"], ev["id"]))   # no-wake replies are dealt with too
 
-        open_cases = self.store.list_cases(OPEN_STAGES)
+        open_cases = [c for c in self.store.list_cases(OPEN_STAGES)
+                      if self.store.is_ours(c["case_id"])]
         for case in open_cases:
             cid, deadline = case["case_id"], case.get("next_deadline")
             if cid in due or not deadline:

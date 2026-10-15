@@ -99,6 +99,27 @@ def test_concurrency_cap(store):
     assert p.tick() == []          # both still in flight
 
 
+def test_watcher_and_schedules_leave_other_teams_refs_alone(store, monkeypatch):
+    """Live, our refs start at c_0101; Person 1's app owns c_0001-c_0008."""
+    from datetime import datetime, timezone
+    from orchestrator.schedules import Scheduler
+    monkeypatch.setenv("CASE_REF_START", "101")
+    add_pack(store, "c_0005", "1001005")            # Person 1's
+    add_pack(store, "c_0101", "1001008")            # ours
+    p = Pipeline(store, advocate_available=True)
+    assert p.our_case_ids() == ["c_0101"]
+    assert p.tick() == ["c_0101"]
+    verdict(store, "c_0005", "survive")
+    p.apply_verdicts()
+    assert store.get_case("c_0005") is None        # no case opened on their pack
+    store.insert_case({"case_id": "c_0005", "uarn": "1001005", "stage": "check_draft",
+                       "owner_approved": True, "owner_approved_at": "2026-10-15T09:00:00+00:00"})
+    noon = datetime(2026, 10, 15, 12, tzinfo=timezone.utc)
+    s = Scheduler(store, run_caseworker=lambda c: None, run_playbook_keeper=lambda: None,
+                  now=lambda: noon, daily_hour=7, nightly_hour=24)
+    assert s.tick() == [] and not any(k.startswith("caseworker_wake") for k in kinds(store))
+
+
 # -- customer requests -> standalone builder -------------------------------
 def customer(store, uarn="1001008", flags=("customer_request",), status="building_pack"):
     store.upsert_candidate({"uarn": uarn, "address": "137 Mare Street", "rv": 30000,
