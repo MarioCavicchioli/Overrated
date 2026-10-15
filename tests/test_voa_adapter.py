@@ -84,6 +84,30 @@ def test_eligible_set_and_a_good_pack_pass(voa):
     assert pack["annual_saving"] == rates.annual_saving(subject["rv"], pack["proposed_rv"], "shop")
 
 
+BLOCK_SUBJECT = "900000101"     # BLOCK STREET: built like 221-233 Old Street
+BLOCK_NEIGHBOURS = ["900000102", "900000103", "900000104", "900000105"]   # all £1,030, 0 m
+
+
+def test_old_street_block_neighbours_are_the_eligible_set(voa):
+    eligible = eligible_comparables(BLOCK_SUBJECT, voa)
+    assert [c["uarn"] for c in eligible][:4] == BLOCK_NEIGHBOURS
+    assert all(c["may_exclude"] for c in eligible[:4])     # each ~2 spreads above the segment
+
+
+def test_old_street_block_cannot_be_excluded_away(voa):
+    """Leaving out three neighbours priced like the subject is rejected: at most one."""
+    pack = build_pack(voa, BLOCK_SUBJECT, exclude=tuple(BLOCK_NEIGHBOURS[:3]))
+    errors = check_pack(pack, voa)
+    assert any("at most 1 eligible comparable" in e for e in errors)
+
+
+def test_old_street_block_has_no_case_within_the_rule(voa):
+    """With the one exclusion allowed, the median is still the block's price: no reduction."""
+    pack = build_pack(voa, BLOCK_SUBJECT, exclude=(BLOCK_NEIGHBOURS[0],))
+    assert pack["proposed_rv"] >= pack["current_rv"]
+    assert any("proposed_rv must be below current_rv" in e for e in check_pack(pack, voa))
+
+
 def test_unknown_uarn_and_bad_key(voa):
     with pytest.raises(NotFound):
         voa.get_valuation("123")

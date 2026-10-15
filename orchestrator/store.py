@@ -85,6 +85,8 @@ class Store(Protocol):
     def upsert_candidate(self, row: dict[str, Any]) -> None: ...
     def get_candidate(self, uarn: str) -> dict[str, Any] | None: ...
     def set_candidate_status(self, uarn: str, status: str) -> None: ...
+    def list_candidates(self, status: str) -> list[dict[str, Any]]: ...
+    def has_pack(self, uarn: str) -> bool: ...
     def next_case_id(self) -> str: ...
     def insert_pack(self, row: dict[str, Any]) -> None: ...
     def get_pack(self, case_id: str) -> dict[str, Any] | None: ...
@@ -101,8 +103,9 @@ class Store(Protocol):
     def add_event(self, agent: str, kind: str, message: str, case_id: str | None = None,
                   tokens: int = 0, ts: str | None = None, cost_usd: float | None = None,
                   idempotency_key: str | None = None, run_id: str | None = None,
-                  payload: dict | None = None) -> None: ...
+                  payload: dict | None = None, candidate_id: str | None = None) -> None: ...
     def count_events(self, kind: str, case_id: str) -> int: ...
+    def count_candidate_events(self, kind: str, candidate_id: str) -> int: ...
     def last_event(self, kind: str, case_id: str | None = None) -> dict[str, Any] | None: ...
     def events_since(self, kind: str, since_ts: str | None,
                      limit: int = 200) -> list[dict[str, Any]]: ...
@@ -198,6 +201,15 @@ class BaseStore:
             self._update("candidates", {"status": status, "updated_at": now_iso()},
                          [("candidate_id", "eq", cand["candidate_id"])])
 
+    def list_candidates(self, status: str) -> list[dict[str, Any]]:
+        if status not in CANDIDATE_STATUSES:
+            raise ValueError(f"unknown candidate status {status!r}")
+        return self._select("candidates", [("status", "eq", status)], [("created_at", False)])
+
+    def has_pack(self, uarn: str) -> bool:
+        """Any pack for this property, from any builder."""
+        return bool(self._select("packs", [("uarn", "eq", uarn)], limit=1))
+
     # -- packs -----------------------------------------------------------------
     def next_case_id(self) -> str:
         n = 0
@@ -222,7 +234,9 @@ class BaseStore:
             "current_rv": pack.get("current_rv", cand.get("rv") or 0),
             "proposed_rv": row["proposed_rv"], "comparables": row["comparables"],
             "calc": pack.get("calc", {}), "annual_saving": row["annual_saving"],
-            "argument": row["argument"], "evidence_refs": refs, "source_snapshot": _snapshot(),
+            "argument": row["argument"], "evidence_refs": refs,
+            # The VOA download the candidate (and so the pack) was read from.
+            "source_snapshot": row.get("source_snapshot") or cand.get("source_snapshot") or _snapshot(),
             "pdf_url": row.get("pdf_url"), "status": "built",
             "builder_version": row["version"], "pack": pack, "created_at": now_iso(),
         })
@@ -320,8 +334,10 @@ class BaseStore:
     def add_event(self, agent: str, kind: str, message: str, case_id: str | None = None,
                   tokens: int = 0, ts: str | None = None, cost_usd: float | None = None,
                   idempotency_key: str | None = None, run_id: str | None = None,
-                  payload: dict | None = None) -> None:
-        keys = self._keys(case_id)
+                  payload: dict | None = None, candidate_id: str | None = None) -> None:
+        keys = dict(self._keys(case_id))
+        if candidate_id:
+            keys["candidate_id"] = candidate_id
         payload = dict(payload or {})
         if case_id and keys["case_id"] is None:
             payload["case_ref"] = case_id      # no pack yet: keep the ref for the audit log
@@ -331,6 +347,9 @@ class BaseStore:
             "idempotency_key": idempotency_key, "run_id": run_id,
             "payload": payload, **keys,
         })
+
+    def count_candidate_events(self, kind: str, candidate_id: str) -> int:
+        return self._count("events", [("kind", "eq", kind), ("candidate_id", "eq", candidate_id)])
 
     def _event_view(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         refs = self._refs_for({r["case_id"] for r in rows if r.get("case_id")})

@@ -100,8 +100,8 @@ tools:
             additionalProperties: false
         exclusions:
           type: array
-          description: "eligible comparables you left out; only those with may_exclude true"
-          maxItems: 6
+          description: "the eligible comparable you left out, if any: at most one, with may_exclude true"
+          maxItems: 1
           items:
             type: object
             properties:
@@ -145,7 +145,7 @@ How shops are valued. A shop is split into zones from the front window: Zone A i
 How to work:
 1. get_valuation for the candidate. Note its use, zones and Zone A price.
 2. street_tone for its street_key. Compare the candidate's Zone A price with the median and spread.
-3. eligible_comparables for the candidate. Your pack must use every one of them. You may leave one out only if its may_exclude is true (more than 2 spreads from the street median); list each one you leave out in exclusions with its reason. Never pick and choose among the others.
+3. eligible_comparables for the candidate. Your pack must use every one of them. You may leave out at most one, and only one whose may_exclude is true (more than 2 spreads from the street median); list it in exclusions with its reason. Never pick and choose among the others. If several neighbours are priced like the candidate, the street is priced that way on purpose: call no_case.
 4. Pick the Zone A price you argue for: the median of the Zone A prices of the comparables you use. proposed_rv = round(candidate ITZA x that price). It must be below current_rv.
 5. Write the argument for the property owner in plain English, in 120 to 250 words: what the candidate is valued at, what similar shops nearby are valued at (cite their UARNs, prices and distances), any comparable you left out and why, and the proposed value and how you got it. Do not state the annual saving: code computes it and the pack shows it. No legal jargon, no promises of an outcome.
 6. Call submit_pack. If it is rejected, fix every problem listed and resubmit.

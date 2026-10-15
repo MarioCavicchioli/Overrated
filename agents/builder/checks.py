@@ -24,6 +24,8 @@ COMP_MAX_DISTANCE_M = float(os.getenv("COMP_MAX_DISTANCE_M", "200"))
 SIZE_RATIO_MIN, SIZE_RATIO_MAX = 0.5, 2.0   # comparable floor area vs the subject's
 MAX_COMPARABLES = 6
 EXCLUDE_BEYOND_SPREADS = 2.0                 # an eligible comparable may be left out only past this
+MAX_EXCLUSIONS = 1                           # and at most one: a block priced like the subject
+                                             # (e.g. 221-233 Old Street) can't be excluded away
 PRICE_TOL = 0.5                              # GBP/m2, for rounding
 DISTANCE_TOL_M = 0.5
 
@@ -156,6 +158,10 @@ def check_pack(pack: dict[str, Any], data: DataClient) -> list[str]:
     # one out only if it is more than EXCLUDE_BEYOND_SPREADS from the street median.
     eligible = {c["uarn"]: c for c in eligible_comparables(pack["uarn"], data)}
     excluded: dict[str, dict] = {}
+    if len(pack.get("exclusions", [])) > MAX_EXCLUSIONS:
+        errors.append(f"exclusions: {len(pack['exclusions'])} listed; a pack may leave out at most "
+                      f"{MAX_EXCLUSIONS} eligible comparable. If the neighbours you'd leave out are "
+                      "priced like the candidate, there is no clear case: call no_case")
     for i, ex in enumerate(pack.get("exclusions", [])):
         tag = f"exclusions[{i}] {ex['uarn']}"
         if ex["uarn"] in seen or ex["uarn"] in excluded:

@@ -99,6 +99,71 @@ def test_concurrency_cap(store):
     assert p.tick() == []          # both still in flight
 
 
+# -- customer requests -> standalone builder -------------------------------
+def customer(store, uarn="1001008", flags=("customer_request",), status="building_pack"):
+    store.upsert_candidate({"uarn": uarn, "address": "137 Mare Street", "rv": 30000,
+                            "status": status, "flags": list(flags)})
+
+
+def fake_builder(store, calls):
+    def run(uarn):
+        calls.append(uarn)
+        ref = store.next_case_id()
+        store.insert_pack({"case_id": ref, "uarn": uarn, "pack": {"case_id": ref, "uarn": uarn},
+                           "comparables": [], "proposed_rv": 25000, "annual_saving": 1910,
+                           "argument": "x" * 50, "version": "builder-v1"})
+        store.set_candidate_status(uarn, "pack_ready")
+        return "pack_ready"
+    return run
+
+
+def test_customer_request_builds_then_advocate_then_case(store):
+    customer(store)
+    calls = []
+    p = Pipeline(store, run_builder=fake_builder(store, calls),
+                 run_advocate=lambda cid: verdict(store, cid, "survive"), advocate_available=True)
+    started = p.tick_builds()
+    assert [c["uarn"] for c in started] == ["1001008"]
+    p.build("1001008", started[0]["candidate_id"])
+    p.building.clear()
+    assert calls == ["1001008"] and p.tick_builds() == []      # it has a pack now
+    assert p.tick() == ["c_0001"]                               # normal advocate flow follows
+    p.judge("c_0001")
+    assert store.get_case("c_0001")["stage"] == "waiting_owner"
+    assert {"builder_started", "builder_finished", "advocate_started", "case_opened"} \
+        <= set(kinds(store))
+
+
+def test_scout_batches_and_packed_properties_are_left_alone(store):
+    customer(store, "1001008", flags=["zone_a_above_tone"])     # a Scout hand-off: no flag
+    add_pack(store, "c_0001", "1001012")                         # already has a pack
+    store.set_candidate_status("1001012", "building_pack")
+    store.upsert_candidate({"uarn": "1001012", "flags": ["customer_request"]})
+    assert Pipeline(store, run_builder=lambda u: "pack_ready").tick_builds() == []
+
+
+def test_failing_builder_retried_three_times(store):
+    customer(store)
+
+    def boom(uarn):
+        raise RuntimeError("session failed")
+
+    p = Pipeline(store, run_builder=boom)
+    for _ in range(5):
+        for cand in p.tick_builds():
+            p.build(cand["uarn"], cand["candidate_id"])
+        p.building.clear()
+    assert kinds(store).count("builder_started") == 3
+    assert kinds(store).count("builder_failed") == 3
+
+
+def test_builder_concurrency_cap(store):
+    for u in ("1001001", "1001002", "1001003"):
+        customer(store, u)
+    p = Pipeline(store, run_builder=lambda u: "pack_ready", max_concurrent_builds=2)
+    assert len(p.tick_builds()) == 2 and p.tick_builds() == []
+
+
 # -- owner approval --------------------------------------------------------
 @pytest.fixture
 def api(store, monkeypatch):
