@@ -8,6 +8,8 @@ The handler writes its output event with a unique idempotency key before changin
 
 Each output event stores session input/output token totals and list cost when returned by the Managed Agents API. Events include a draft reply, rationale, action, stage recommendation, source identifier, and simulation marker.
 
+For local runs, install dependencies with python -m pip install -r agents/caseworker/requirements.txt, copy .env.example to .env, and fill in the values below. The Caseworker loads .env from the repository root; process/CI environment variables take precedence.
+
 Required server-side environment variables:
 - ANTHROPIC_API_KEY
 - CASEWORKER_AGENT_ID

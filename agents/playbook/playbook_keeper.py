@@ -5,7 +5,18 @@ import json
 import os
 import re
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any
+
+# Load the repository-root .env for local runs, without overriding process/CI env vars.
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if load_dotenv is not None:
+    load_dotenv(REPO_ROOT / ".env", override=False)
 
 AGENT_ID = os.environ.get("PLAYBOOK_KEEPER_AGENT_ID", "")
 ENVIRONMENT_ID = os.environ.get("MANAGED_AGENT_ENVIRONMENT_ID", "")
@@ -40,6 +51,25 @@ def validate_proposal(value: Any) -> dict[str, Any]:
     if not isinstance(rationale, str) or not rationale.strip():
         raise RuntimeError("Proposal rationale must be non-empty text")
     return {"rules": rules, "diff": diff, "rationale": rationale}
+
+
+def _rules_diff(before: Any, after: Any) -> Any:
+    """Build a JSON-safe diff from actual rules instead of trusting model text."""
+    if isinstance(before, dict) and isinstance(after, dict):
+        changes: dict[str, Any] = {}
+        for key in sorted(before.keys() | after.keys()):
+            if key not in before:
+                changes[key] = {"to": after[key]}
+            elif key not in after:
+                changes[key] = {"from": before[key]}
+            else:
+                change = _rules_diff(before[key], after[key])
+                if change is not None:
+                    changes[key] = change
+        return changes or None
+    if before != after:
+        return {"from": before, "to": after}
+    return None
 
 
 def _session_cost(session: Any) -> tuple[int | None, str | None]:
@@ -100,6 +130,8 @@ This output is a candidate only. Never promote it to live, reject another versio
         proposal = validate_proposal(json.loads(raw))
     except json.JSONDecodeError as exc:
         raise RuntimeError("Playbook Keeper did not return valid JSON") from exc
+    # Store a diff computed from the proposed rules, not a model-generated claim.
+    proposal["diff"] = _rules_diff(context["live_rules"], proposal["rules"]) or {}
     completed = anthropic.beta.sessions.retrieve(session.id)
     tokens, cost = _session_cost(completed)
     return proposal, tokens, cost
@@ -131,8 +163,10 @@ def propose_candidate() -> dict[str, Any]:
     if not evaluations:
         raise RuntimeError("No completed heldout eval runs are available")
     eval_ids = [str(row["eval_run_id"]) for row in evaluations if row.get("eval_run_id")]
-    if not eval_ids:
+    if len(eval_ids) != len(evaluations) or not eval_ids:
         raise RuntimeError("Heldout evaluations are missing eval_run_id values")
+    if len(set(eval_ids)) != len(eval_ids):
+        raise RuntimeError("Heldout evaluations contain duplicate eval_run_id values")
     version, idempotency_key = _proposal_identity(live["version"], eval_ids)
     previous_event = db.table("events").select("*").eq("idempotency_key", idempotency_key).limit(1).execute()
     if previous_event.data:
@@ -147,6 +181,8 @@ def propose_candidate() -> dict[str, Any]:
     } for row in evaluations]
     context = {"base_version": live["version"], "live_rules": live["rules"], "heldout_evaluations": compact_evals}
     proposal, tokens, cost = _model_proposal(anthropic, context)
+    proposal = validate_proposal(proposal)
+    proposal["diff"] = _rules_diff(live["rules"], proposal["rules"]) or {}
     if not proposal["diff"]:
         return {"status": "no_candidate", "rationale": proposal["rationale"]}
 
@@ -157,20 +193,41 @@ def propose_candidate() -> dict[str, Any]:
     if not current.data or current.data[0]["version"] != live["version"]:
         raise RuntimeError("Live playbook changed during generation; discard and rerun")
 
-    existing = db.table("playbook").select("playbook_id").eq("version", version).limit(1).execute()
+    existing = db.table("playbook").select("playbook_id,status,based_on_version,rules,diff").eq("version", version).limit(1).execute()
     if existing.data:
-        candidate_id = existing.data[0]["playbook_id"]
+        existing_candidate = existing.data[0]
+        if (existing_candidate.get("status") != "candidate"
+                or existing_candidate.get("based_on_version") != live["version"]
+                or existing_candidate.get("rules") != proposal["rules"]
+                or existing_candidate.get("diff") != proposal["diff"]):
+            raise RuntimeError("A playbook with this deterministic version already exists with different content or state")
+        candidate_id = existing_candidate["playbook_id"]
     else:
-        inserted = db.table("playbook").insert({
+        candidate_row = {
             "version": version, "rules": proposal["rules"], "status": "candidate",
             "based_on_version": live["version"], "diff": proposal["diff"],
             "eval_run_id": None, "created_by": "playbook_keeper",
-        }).execute()
-        if not inserted.data:
-            raise RuntimeError("Candidate playbook was not persisted")
-        candidate_id = inserted.data[0]["playbook_id"]
+        }
+        try:
+            inserted = db.table("playbook").insert(candidate_row).execute()
+        except Exception:
+            # Another scheduled invocation may have inserted the same version.
+            raced = db.table("playbook").select("playbook_id,status,based_on_version,rules,diff").eq("version", version).limit(1).execute()
+            if not raced.data:
+                raise
+            existing_candidate = raced.data[0]
+            if (existing_candidate.get("status") != "candidate"
+                    or existing_candidate.get("based_on_version") != live["version"]
+                    or existing_candidate.get("rules") != proposal["rules"]
+                    or existing_candidate.get("diff") != proposal["diff"]):
+                raise RuntimeError("Concurrent playbook insert produced a conflicting candidate row")
+            candidate_id = existing_candidate["playbook_id"]
+        else:
+            if not inserted.data:
+                raise RuntimeError("Candidate playbook was not persisted")
+            candidate_id = inserted.data[0]["playbook_id"]
 
-    event = db.table("events").insert({
+    event_row = {
         "agent": "playbook", "kind": "playbook_candidate_proposed",
         "message": proposal["rationale"], "tokens": tokens, "cost_usd": cost,
         "payload": {
@@ -178,7 +235,15 @@ def propose_candidate() -> dict[str, Any]:
             "evaluation_ids": eval_ids, "diff": proposal["diff"], "status": "candidate",
         },
         "idempotency_key": idempotency_key,
-    }).execute()
+    }
+    try:
+        event = db.table("events").insert(event_row).execute()
+    except Exception:
+        # The unique idempotency key makes concurrent retries safe.
+        previous_event = db.table("events").select("*").eq("idempotency_key", idempotency_key).limit(1).execute()
+        if not previous_event.data:
+            raise
+        return {"status": "already_proposed", "event": previous_event.data[0]}
     return {"status": "candidate_created", "candidate_id": candidate_id, "version": version,
             "event": event.data[0] if event.data else None}
 

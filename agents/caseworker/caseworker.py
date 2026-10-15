@@ -6,7 +6,18 @@ import re
 import sys
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any
+
+# Load the repository-root .env for local runs, without overriding process/CI env vars.
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if load_dotenv is not None:
+    load_dotenv(REPO_ROOT / ".env", override=False)
 
 AGENT_ID = os.environ.get("CASEWORKER_AGENT_ID", "")
 ENVIRONMENT_ID = os.environ.get("MANAGED_AGENT_ENVIRONMENT_ID", "")
