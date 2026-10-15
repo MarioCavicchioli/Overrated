@@ -1,0 +1,38 @@
+{
+  "_source": "packs row c_0001 from the p2-cases store, built 2026-10-15T10:29:36.934Z by builder-v1",
+  "pack": {
+    "address": "137 Mare Street, Hackney, London E8 3RH",
+    "annual_saving": 3695,
+    "argument": "Your shop at 137 Mare Street is currently valued using a Zone A price of £550 per square metre, which gives a rateable value of £35,475. That is well above the level for the rest of the street. Across Mare Street the median Zone A price is £405, with a typical variation of about £27.50, so £550 sits roughly five variations above the norm. Shops close to yours of similar size and the same use are valued lower. Number 139 (UARN 1001009), 20 metres away, is at £410 per square metre. Number 133 (UARN 1001006), 45 metres away, is at £400. Number 129 (UARN 1001004), 90 metres away, is at £390. The middle figure of these three is £400 per square metre. Your shop's area, weighted by zone, comes to 64.5 square metres in terms of Zone A (44 in Zone A, plus half of 32 in Zone B, plus a quarter of 18 in Zone C). Applying £400 gives a proposed rateable value of £25,800, compared with the current £35,475. At the 0.382 multiplier for shops under £51,000, the yearly bill would fall from about £13,551 to about £9,856, a saving of roughly £3,695 a year. We suggest asking the valuation office to review the value in light of these neighbouring shops. The outcome cannot be guaranteed.",
+    "calc": {
+      "street_median": 405,
+      "street_spread": 27.5,
+      "zone_a_price": 550
+    },
+    "comparables": [
+      {
+        "distance_m": 20,
+        "uarn": "1001009",
+        "use": "shop",
+        "zone_a_price": 410
+      },
+      {
+        "distance_m": 45,
+        "uarn": "1001006",
+        "use": "shop",
+        "zone_a_price": 400
+      },
+      {
+        "distance_m": 90,
+        "uarn": "1001004",
+        "use": "shop",
+        "zone_a_price": 390
+      }
+    ],
+    "current_rv": 35475,
+    "proposed_rv": 25800,
+    "uarn": "1001008",
+    "case_id": "c_0001",
+    "version": "builder-v1"
+  }
+}
